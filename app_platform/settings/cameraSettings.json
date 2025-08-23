@@ -1,0 +1,30 @@
+[
+    {
+        "command": "set_value",
+        "name": "9963793",
+        "source": 0,
+        "type": 0,
+        "value": 47171
+    },
+    {
+        "command": "set_value",
+        "name": "10026993",
+        "source": 0,
+        "type": 0,
+        "value": 0
+    },
+    {
+        "command": "set_value",
+        "name": "awb",
+        "source": 3,
+        "type": 4,
+        "value": true
+    },
+    {
+        "command": "set_value",
+        "name": "10356995",
+        "source": 0,
+        "type": 0,
+        "value": 24198
+    }
+]

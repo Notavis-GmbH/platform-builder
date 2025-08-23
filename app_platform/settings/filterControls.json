@@ -1,0 +1,58 @@
+{
+    "block": [
+        "Horizontal Flip",
+        "Vertical Flip",
+        "Gain",
+        "Camera Orientation",
+        "Camera Sensor Rotation",
+        "Vertical Blanking",
+        "Red Pixel Value",
+        "Green (Red) Pixel Value",
+        "Blue Pixel Value",
+        "Green (Blue) Pixel Value",
+        "Link Frequency",
+        "Pixel Rate",
+        "Test Pattern",
+        "Colour Correction Matrix",
+        "Lens Shading",
+        "Black Level",
+        "Gamma",
+        "Denoise",
+        "Sharpen",
+        "Defective Pixel Correction",
+        "Colour Denoise",
+        "#Max Frame Rate",
+        "Send JPG",
+        "Green equalisation",
+        "#Enable AWB",
+        "Calculate sharpness",
+	"Binning Mode",
+        "Color Temperature",
+        "Performance Test Recording",
+        "Frames to be recorded for performance test",
+        "PerformanceFrames",
+        "Sensor orientation",
+        "Sensor rotation",
+        "Horizontal Blanking",
+        "#Analogue Gain",
+        "Roi Position"
+    ],
+    "maxValues": {
+        "Exposure": 500000,
+        "Blue Balance": 10000,
+        "Red Balance": 10000,
+        "Digital Gain": 10000,
+        "Horizontal Blanking": 10000
+    },
+    "minValues": {},
+    "hints": {
+        "ExposureTime": "Exposure time in microseconds",
+        "Blue Balance": "Blue balance value",
+        "Red Balance": "Red balance value",
+        "Digital Gain": "Digital gain value",
+        "Trigger Mode": "0 for streaming, 1 for external trigger, 4 for single trigger",
+        "Exposure": "Exposure time in microseconds"
+
+
+    }
+}
