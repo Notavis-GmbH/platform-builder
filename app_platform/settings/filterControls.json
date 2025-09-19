@@ -42,7 +42,8 @@
         "Blue Balance": 10000,
         "Red Balance": 10000,
         "Digital Gain": 10000,
-        "Horizontal Blanking": 10000
+        "Horizontal Blanking": 10000,
+        "Frame Rate": 100000
     },
     "minValues": {},
     "hints": {
@@ -51,8 +52,9 @@
         "Red Balance": "Red balance value",
         "Digital Gain": "Digital gain value",
         "Trigger Mode": "0 for streaming, 1 for external trigger, 4 for single trigger",
-        "Exposure": "Exposure time in microseconds"
-
+        "Exposure": "Exposure time in microseconds",
+        "Frame Rate": "Max frame rate for sensor in mHz, 0 means as fast as possible" 
+        
 
     }
 }
