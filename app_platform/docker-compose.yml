@@ -6,7 +6,7 @@ services:
     network_mode: host
 
   camera:
-    image: registry.fls-engineering.de/cam_libcamera:2.1.0
+    image: registry.fls-engineering.de/cam_v4l2:2.3.0
     working_dir: /test
     volumes:
       - signals:/signals
@@ -29,14 +29,15 @@ services:
       - CAMERA_USE_ISP=OFF
       - CAMERA_CONTROL_SETTINGSFILE=/settings/cameraSettings.json
       - LIBCAMERA_RPI_CONFIG_FILE=/app/pisp_config.yaml
-
+      - CAMERA_TEST_MODE=OFF
+      - CAMERA_MAX_WIDTH_JPG=1000
 
     network_mode: host
     privileged: true
     restart: unless-stopped
     depends_on: [backend]
   backend:
-    image: registry.fls-engineering.de/backend:1.8.0
+    image: registry.fls-engineering.de/backend:1.7.0
     volumes:
       - signals:/signals
       - images:/images
@@ -87,7 +88,6 @@ services:
     volumes:
       - history_images:/ftp_root/notavis/liveviewImages
       - trigger_images:/ftp_root/notavis/triggerImages
-      - /images/:/ftp_root/notavis/performanceImages
     restart: always
   
   wetty:
