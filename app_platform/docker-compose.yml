@@ -1,12 +1,12 @@
 services:
   client:
-    image: registry.fls-engineering.de/client:1.0.0a
+    image: reg.fls-engineering.de/library/client:1.0.0a
     env_file:
       - .env
     network_mode: host
 
   camera:
-    image: registry.fls-engineering.de/cam_v4l2:2.3.0
+    image: reg.fls-engineering.de/library/cam_v4l2:2.3.0
     working_dir: /test
     volumes:
       - signals:/signals
@@ -37,7 +37,7 @@ services:
     restart: unless-stopped
     depends_on: [backend]
   backend:
-    image: registry.fls-engineering.de/backend:1.7.0
+    image: reg.fls-engineering.de/library/backend:1.7.0
     volumes:
       - signals:/signals
       - images:/images
@@ -82,7 +82,7 @@ services:
     network_mode: host
     
   ftpServer:
-    image: registry.fls-engineering.de/ftpserver:1.4.0
+    image: reg.fls-engineering.de/library/ftpserver:1.4.0
     network_mode: host
     command: python ftpServer.py --user notavis --password pirmasens --passive 4000-4010
     volumes:
