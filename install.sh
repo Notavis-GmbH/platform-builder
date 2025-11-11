@@ -44,13 +44,24 @@ EOF
 
 newgrp
 
-# Set WLAN country to Germany
-sudo sed -i '/^country=/d' /etc/wpa_supplicant/wpa_supplicant.conf
-echo 'country=DE' | sudo tee -a /etc/wpa_supplicant/wpa_supplicant.conf
-
-# Optionally set CRDA country (for older systems)
-sudo sed -i '/^REGDOMAIN=/d' /etc/default/crda
-echo 'REGDOMAIN=DE' | sudo tee -a /etc/default/crda
+# Set WLAN country to Germany (for Debian 13/modern Raspberry Pi OS)
+if command -v raspi-config &> /dev/null; then
+    # Use raspi-config if available (Raspberry Pi OS)
+    sudo raspi-config nonint do_wifi_country DE
+else
+    # Fallback for other Debian systems - use iw regulatory domain
+    sudo iw reg set DE
+    # Make it persistent by setting in /etc/default/crda if the file exists
+    if [ -f /etc/default/crda ]; then
+        sudo sed -i '/^REGDOMAIN=/d' /etc/default/crda
+        echo 'REGDOMAIN=DE' | sudo tee -a /etc/default/crda
+    fi
+    # Also try the old wpa_supplicant method as fallback
+    if [ -f /etc/wpa_supplicant/wpa_supplicant.conf ]; then
+        sudo sed -i '/^country=/d' /etc/wpa_supplicant/wpa_supplicant.conf
+        echo 'country=DE' | sudo tee -a /etc/wpa_supplicant/wpa_supplicant.conf
+    fi
+fi
 
 # Unblock Wi-Fi via rfkill and prevent blocking on boot
 sudo rfkill unblock wifi
