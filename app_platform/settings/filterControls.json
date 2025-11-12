@@ -26,7 +26,7 @@
         "Green equalisation",
         "#Enable AWB",
         "Calculate sharpness",
-	"Binning Mode",
+	    "Binning Mode",
         "Color Temperature",
         "Performance Test Recording",
         "Frames to be recorded for performance test",
@@ -35,7 +35,8 @@
         "Sensor rotation",
         "Horizontal Blanking",
         "#Analogue Gain",
-        "Roi Position"
+        "Roi Position",
+        "Live Roi"
     ],
     "maxValues": {
         "Exposure": 500000,

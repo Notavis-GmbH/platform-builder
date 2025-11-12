@@ -4,7 +4,7 @@
         "name": "9963793",
         "source": 0,
         "type": 0,
-        "value": 169812
+        "value": 56605
     },
     {
         "command": "set_value",
@@ -25,6 +25,34 @@
         "name": "10356995",
         "source": 0,
         "type": 0,
-        "value": 24198
+        "value": 55698
+    },
+    {
+        "command": "set_value",
+        "name": "Mono",
+        "source": 3,
+        "type": 4,
+        "value": false
+    },
+    {
+        "command": "set_value",
+        "name": "FlipVertical",
+        "source": 3,
+        "type": 4,
+        "value": true
+    },
+    {
+        "command": "set_value",
+        "name": "FlipHorizontal",
+        "source": 3,
+        "type": 4,
+        "value": true
+    },
+    {
+        "command": "set_value",
+        "name": "10026994",
+        "source": 0,
+        "type": 0,
+        "value": 566
     }
 ]
