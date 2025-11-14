@@ -214,11 +214,11 @@ sudo systemctl mask rfkill.socket
 # echo "Firefox kiosk mode setup complete. The system will start in kiosk mode after reboot."
 # echo "Kiosk will display: http://localhost:80"
 
-wget https://raw.githubusercontent.com/VC-MIPI-modules/vc_mipi_raspi/main/Makefile
+wget -N --timestamping  https://raw.githubusercontent.com/VC-MIPI-modules/vc_mipi_raspi/main/Makefile
 
 make all
 
-wget https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v0.6.7/vc-mipi-driver-bcm2712_0.6.7_arm64.deb
+wget -N --timestamping  https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v0.6.7/vc-mipi-driver-bcm2712_0.6.7_arm64.deb
 
 sudo apt install ./vc-mipi-driver-bcm2712_0.6.7_arm64.deb -y
 

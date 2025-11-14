@@ -4,7 +4,7 @@
         "name": "9963793",
         "source": 0,
         "type": 0,
-        "value": 56605
+        "value": 110260
     },
     {
         "command": "set_value",
@@ -53,6 +53,6 @@
         "name": "10026994",
         "source": 0,
         "type": 0,
-        "value": 566
+        "value": 8252
     }
 ]

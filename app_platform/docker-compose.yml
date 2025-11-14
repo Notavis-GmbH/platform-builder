@@ -4,6 +4,18 @@ services:
     env_file:
       - .env
     network_mode: host
+  siemensstern:
+    image: registry.fls-engineering.de/siemensstern:1.0.0
+    env_file:
+      - .env
+    environment:
+      - SIEMENS_SOCKET=ipc:///signals/app.0
+      - SIEMENS_TEMPLATE_PATH=/app/template.png
+      - SIEMENS_POSITION_DETECTION_INTERVAL=5
+    volumes:
+      - signals:/signals
+      - ./template.png:/app/template.png
+    network_mode: host
 
   camera:
     image: reg.fls-engineering.de/library/cam_v4l2:2.3.0
@@ -16,6 +28,8 @@ services:
       - ./pisp_config.yaml:/app/pisp_config.yaml
     environment:
       - CAMERA_IPCPORT=ipc:///signals/cam.out.0
+      - _CAMERA_IPCPORT=tcp://192.168.1.32:5550
+
       - CAMERA_IPCPORTCONTROL=ipc:///signals/cam.control.0
       - CAMERA_DEVICE=/dev/video0
       - CAMERA_SENDJPG=ON
@@ -37,7 +51,7 @@ services:
     restart: unless-stopped
     depends_on: [backend]
   backend:
-    image: reg.fls-engineering.de/library/backend:1.7.0
+    image: reg.fls-engineering.de/library/backend:1.8.0
     volumes:
       - signals:/signals
       - images:/images
@@ -70,8 +84,9 @@ services:
       - identifier_file_path=/license/identifier.enc
       - license_file_path=/license/license.lic
       - ./history_images_directory=/history_images/
-      - app_active=False
-      - app_host=ipc:///signals/barcode.0
+      - app_active=True
+      - app_host=ipc:///signals/app.
+      - _app_host=tcp://192.168.1.60:410
       - csv_file=/history_images/barcodes.csv
       - ftp_folder=/./trigger_images
       - customer_logo=/settings/customer_logo.png
