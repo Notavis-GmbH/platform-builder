@@ -5,7 +5,7 @@ services:
       - .env
     network_mode: host
   siemensstern:
-    image: registry.fls-engineering.de/siemensstern:1.0.0
+    image: reg.fls-engineering.de/library/siemensstern:1.0.0
     env_file:
       - .env
     environment:
@@ -51,7 +51,7 @@ services:
     restart: unless-stopped
     depends_on: [backend]
   backend:
-    image: reg.fls-engineering.de/library/backend:1.8.0
+    image: reg.fls-engineering.de/library/backend:1.8.0a
     volumes:
       - signals:/signals
       - images:/images
@@ -85,8 +85,8 @@ services:
       - license_file_path=/license/license.lic
       - ./history_images_directory=/history_images/
       - app_active=True
-      - app_host=ipc:///signals/app.
-      - _app_host=tcp://192.168.1.60:410
+      - _app_host=ipc:///signals/app.
+      - app_host=tcp://192.168.1.60:410
       - csv_file=/history_images/barcodes.csv
       - ftp_folder=/./trigger_images
       - customer_logo=/settings/customer_logo.png
@@ -118,5 +118,10 @@ services:
 
 volumes:
   signals:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=10M
   images:
   logs:
