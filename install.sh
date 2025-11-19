@@ -214,7 +214,7 @@ sudo systemctl mask rfkill.socket
 # echo "Firefox kiosk mode setup complete. The system will start in kiosk mode after reboot."
 # echo "Kiosk will display: http://localhost:80"
 
-wget https://raw.githubusercontent.com/VC-MIPI-modules/vc_mipi_raspi/main/Makefile
+# wget https://raw.githubusercontent.com/VC-MIPI-modules/vc_mipi_raspi/main/Makefile
 
 make all
 
