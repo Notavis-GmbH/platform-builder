@@ -223,11 +223,11 @@ wget https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v0.6.7/v
 sudo apt install ./vc-mipi-driver-bcm2712_0.6.7_arm64.deb -y
 
 # Add log limit to 10 mb for docker globally
+mkdir -p ~/.docker/
+cp resources/config.json ~/.docker/config.json
 
-cp resources/config.json /home/notavis/.docker/config.json
-
-docker compose -f docker-compose.raspap.yml up -d
+sudo docker compose -f docker-compose.raspap.yml up -d
 
 cd app_platform
 
-docker compose up -d
+sudo docker compose up -d
