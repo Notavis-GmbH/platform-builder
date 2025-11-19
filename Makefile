@@ -20,7 +20,7 @@ installLibPisp:
 	git clone https://github.com/VC-MIPI-modules/libpisp || true && \
 	cd libpisp && \
 	meson setup build && \
-	meson compile -C build && \
+	meson compile -C build -j 1 && \
 	sudo meson install -C build
 
 installLibcamera:
@@ -39,7 +39,7 @@ installLibcamera:
 	  -Dqcam=disabled \
 	  -Ddocumentation=disabled \
 	  -Dpycamera=enabled && \
-	meson compile -C build && \
+	meson compile -C build -j 1 && \
 	sudo ninja -C build install
 installLibcamera-rpi4:
 	sudo apt-get remove -y libcamera* || true
@@ -57,7 +57,7 @@ installLibcamera-rpi4:
 	  -Dqcam=disabled \
 	  -Ddocumentation=disabled \
 	  -Dpycamera=enabled && \
-	meson compile -C build && \
+	meson compile -C build -j 1 && \
 	sudo ninja -C build install
 installGstreamer:
 	sudo apt install -y gstreamer1.0-tools gstreamer1.0-plugins-base libgstreamer-plugins-base1.0-dev \
@@ -69,7 +69,7 @@ installRPICamApps:
 	cd rpicam-apps && \
 	git checkout v1.5.2 && \
 	meson setup build  --buildtype=release --prefix=/usr -Ddownload_hailo_models=false -Ddownload_imx500_models=false -Denable_imx500=false && \
-	meson compile -C build && \
+	meson compile -C build -j 1 && \
 	sudo meson install -C build
 	@printf "%s\n" \
 	 "/usr/local/lib/aarch64-linux-gnu" \
@@ -85,7 +85,7 @@ installRPICamAppsHailo:
 	git fetch --tags && \
 	git checkout v1.5.2 && \
 	meson setup build  --buildtype=release -Denable_hailo=enabled -Denable_opencv=enabled -Ddownload_hailo_models=true -Denable_egl=enabled -Denable_imx500=false && \
-	meson compile -C build && \
+	meson compile -C build -j 1 && \
 	sudo meson install -C build 
 	@printf "%s\n" \
 	 "/usr/local/lib/aarch64-linux-gnu" \
