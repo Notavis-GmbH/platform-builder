@@ -34,15 +34,7 @@ iptables -C FORWARD -i wlan0 -o eth0 -j ACCEPT || iptables -A FORWARD -i wlan0 -
 iptables-save > /dev/null
 EOF
 
-# wget https://files.waveshare.com/upload/7/75/CM4_dt_blob.7z
-# 7z x CM4_dt_blob.7z -O./CM4_dt_blob
-# sudo chmod 777 -R CM4_dt_blob
-# cd CM4_dt_blob/
-# # If using two cameras and DSI1, please execute:
-# sudo dtc -I dts -O dtb -o /boot/dt-blob.bin dt-blob-disp1-double_cam.dts
 
-# Refresh group membership for docker (equivalent to newgrp)
-echo "Docker group membership refreshed. You may need to log out and back in for full effect."
 
 # Set WLAN country to Germany (for Debian 13/modern Raspberry Pi OS)
 if command -v raspi-config &> /dev/null; then
@@ -68,159 +60,53 @@ sudo rfkill unblock wifi
 sudo systemctl mask rfkill.service
 sudo systemctl mask rfkill.socket
 
-# # Setup Firefox kiosk mode with Wayland/Sway
-# mkdir -p ~/kiosk ~/.config/sway
+# Check libcamera version before building
+REQUIRED_LIBCAMERA_VERSION="v0.0.0+5323-42d5b620"
+REQUIRED_RPICAM_VERSION="v1.5.2"
 
-# # Create Firefox kiosk startup script
-# cat << 'KIOSK_EOF' > ~/kiosk/start-kiosk.sh
-# #!/bin/bash
-# # Firefox Kiosk Mode Startup Script for Desktop Session
+if command -v libcamera-hello &> /dev/null; then
+    echo "Checking installed libcamera version..."
+    VERSION_OUTPUT=$(libcamera-hello --version 2>&1)
+    
+    INSTALLED_LIBCAMERA=$(echo "$VERSION_OUTPUT" | grep "libcamera build:" | awk '{print $3}')
+    INSTALLED_RPICAM=$(echo "$VERSION_OUTPUT" | grep "rpicam-apps build:" | awk '{print $3}')
+    
+    echo "Installed rpicam-apps: ${INSTALLED_RPICAM}"
+    echo "Installed libcamera: ${INSTALLED_LIBCAMERA}"
+    echo "Required rpicam-apps: ${REQUIRED_RPICAM_VERSION}"
+    echo "Required libcamera: ${REQUIRED_LIBCAMERA_VERSION}"
+    
+    if [ "${INSTALLED_LIBCAMERA}" = "${REQUIRED_LIBCAMERA_VERSION}" ] && [ "${INSTALLED_RPICAM}" = "${REQUIRED_RPICAM_VERSION}" ]; then
+        echo "Correct libcamera and rpicam-apps versions are already installed. Skipping build."
+    else
+        echo "Version mismatch detected. Building libcamera and rpicam-apps..."
+        make all
+    fi
+else
+    echo "libcamera-hello not found. Building libcamera and rpicam-apps..."
+    make all
+fi
 
-# # Wait for desktop session to be ready
-# sleep 10
+# Check if vc-mipi-driver-bcm2712 is already installed with the correct version
+REQUIRED_VERSION="0.6.7"
+PACKAGE_NAME="vc-mipi-driver-bcm2712"
 
-# # Kill any existing Firefox processes
-# pkill firefox-esr 2>/dev/null || true
-
-# # Wait for localhost:80 to be available
-# echo "Waiting for localhost:80 to be available..."
-# while ! curl -s --connect-timeout 2 http://127.0.0.1:80 >/dev/null 2>&1; do
-#     echo "Waiting for service on port 80..."
-#     sleep 2
-# done
-# echo "Service is ready!"
-
-# # Additional wait to ensure service is fully loaded
-# sleep 3
-
-# # Start Firefox in kiosk mode using IP address instead of localhost
-# firefox-esr --kiosk --new-instance --no-remote \
-#     --disable-extensions \
-#     --disable-plugins \
-#     --disable-translate \
-#     --disable-infobars \
-#     --disable-suggestions-service \
-#     --disable-ipc-flooding-protection \
-#     --no-first-run \
-#     --no-default-browser-check \
-#     --homepage=http://127.0.0.1:80 \
-#     http://127.0.0.1:80 &
-
-# # Keep Firefox running and restart if it crashes
-# while true; do
-#     wait $!
-#     echo "Firefox crashed, restarting in 5 seconds..."
-#     sleep 5
-#     pkill firefox-esr 2>/dev/null || true
-#     sleep 2
-#     firefox-esr --kiosk --new-instance --no-remote \
-#         --disable-extensions \
-#         --disable-plugins \
-#         --disable-translate \
-#         --disable-infobars \
-#         --disable-suggestions-service \
-#         --disable-ipc-flooding-protection \
-#         --no-first-run \
-#         --no-default-browser-check \
-#         --homepage=http://127.0.0.1:80 \
-#         http://127.0.0.1:80 &
-# done
-# KIOSK_EOF
-
-# chmod +x ~/kiosk/start-kiosk.sh
-# echo "Created Firefox kiosk startup script at ~/kiosk/start-kiosk.sh"
-# # Create Sway configuration for kiosk mode
-# cat << 'SWAY_EOF' > ~/.config/sway/config
-# # Sway Kiosk Configuration
-
-# # Disable title bars and borders
-# default_border none
-# default_floating_border none
-
-# # Hide cursor after 1 second
-# seat * hide_cursor 1000
-
-# # Disable screen blanking/power management
-# output * dpms on
-
-# # Auto-start Firefox in kiosk mode
-# exec ~/kiosk/start-kiosk.sh
-
-# # # Disable some key bindings for kiosk security
-# # # Keep essential ones for maintenance
-# # bindsym $mod+Return exec foot
-# # bindsym $mod+q kill
-# # bindsym $mod+Shift+c reload
-# # bindsym $mod+Shift+e exit
-
-# # Set mod key to Super (Windows key)
-# set $mod Mod4
-# SWAY_EOF
-
-# # Install Wayland session for RPI Connect compatibility
-# sudo apt-get install -y wayfire
-
-# # Configure LightDM for auto-login with Wayland session
-# sudo tee /etc/lightdm/lightdm.conf > /dev/null << 'LIGHTDM_EOF'
-# [Seat:*]
-# autologin-user=notavis
-# autologin-user-timeout=0
-# user-session=wayfire
-# LIGHTDM_EOF
-
-# # Create desktop autostart entry to run Firefox kiosk in current session
-# mkdir -p ~/.config/autostart
-# cat << 'AUTOSTART_EOF' > ~/.config/autostart/kiosk.desktop
-# [Desktop Entry]
-# Type=Application
-# Name=Kiosk Mode Firefox
-# Exec=/home/notavis/kiosk/start-kiosk.sh
-# Hidden=false
-# NoDisplay=false
-# X-GNOME-Autostart-enabled=true
-# StartupNotify=false
-# AUTOSTART_EOF
-
-# # Create Wayfire autostart configuration
-# mkdir -p ~/.config/wayfire
-# cat << 'WAYFIRE_EOF' > ~/.config/wayfire.ini
-# [autostart]
-# kiosk = /home/notavis/kiosk/start-kiosk.sh
-# panel = wf-panel
-# background = wf-background
-
-# [core]
-# plugins = animate autostart command cube expo fast-switcher fisheye grid idle invert move oswitch place resize switcher vswitch window-rules wobbly zoom
-
-# [input]
-# xkb_layout = de
-# xkb_variant = 
-# cursor_theme = default
-# cursor_size = 24
-# WAYFIRE_EOF
-
-# # Also create a simple script to start kiosk manually if needed
-# cat << 'MANUAL_EOF' > ~/start-kiosk-now.sh
-# #!/bin/bash
-# echo "Starting Firefox kiosk mode..."
-# ~/kiosk/start-kiosk.sh
-# MANUAL_EOF
-
-# chmod +x ~/start-kiosk-now.sh
-
-# # Ensure curl is installed for the kiosk script
-# sudo apt-get install -y curl
-
-# echo "Firefox kiosk mode setup complete. The system will start in kiosk mode after reboot."
-# echo "Kiosk will display: http://localhost:80"
-
-# wget https://raw.githubusercontent.com/VC-MIPI-modules/vc_mipi_raspi/main/Makefile
-
-make all
-
-wget https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v0.6.7/vc-mipi-driver-bcm2712_0.6.7_arm64.deb
-
-sudo apt install ./vc-mipi-driver-bcm2712_0.6.7_arm64.deb -y
+if dpkg -l | grep -q "^ii  ${PACKAGE_NAME}"; then
+    INSTALLED_VERSION=$(dpkg -l | grep "^ii  ${PACKAGE_NAME}" | awk '{print $3}')
+    echo "Found ${PACKAGE_NAME} version ${INSTALLED_VERSION}"
+    
+    if [ "${INSTALLED_VERSION}" = "${REQUIRED_VERSION}" ]; then
+        echo "${PACKAGE_NAME} version ${REQUIRED_VERSION} is already installed. Skipping installation."
+    else
+        echo "Installed version (${INSTALLED_VERSION}) does not match required version (${REQUIRED_VERSION}). Updating..."
+        wget -N --timestamping https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v0.6.7/vc-mipi-driver-bcm2712_0.6.7_arm64.deb
+        sudo apt install ./vc-mipi-driver-bcm2712_0.6.7_arm64.deb -y
+    fi
+else
+    echo "${PACKAGE_NAME} is not installed. Installing version ${REQUIRED_VERSION}..."
+    wget -N --timestamping https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v0.6.7/vc-mipi-driver-bcm2712_0.6.7_arm64.deb
+    sudo apt install ./vc-mipi-driver-bcm2712_0.6.7_arm64.deb -y
+fi
 
 # Add log limit to 10 mb for docker globally
 mkdir -p ~/.docker/
