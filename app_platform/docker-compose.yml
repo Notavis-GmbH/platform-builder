@@ -1,12 +1,12 @@
 services:
-  client:
-    image: reg.fls-engineering.de/library/client:1.0.0a
-    env_file:
-      - .env
-    network_mode: host
+  # client:
+  #   image: reg.fls-engineering.de/library/client:1.0.0a
+  #   env_file:
+  #     - .env
+  #   network_mode: host
 
   camera:
-    image: reg.fls-engineering.de/library/cam_v4l2:2.3.0
+    image: reg.fls-engineering.de/library/cam_v4l2:2.5.0
     working_dir: /test
     volumes:
       - signals:/signals
@@ -37,7 +37,7 @@ services:
     restart: unless-stopped
     depends_on: [backend]
   backend:
-    image: reg.fls-engineering.de/library/backend:1.7.0
+    image: reg.fls-engineering.de/library/backend:1.9.0
     volumes:
       - signals:/signals
       - images:/images
@@ -103,5 +103,10 @@ services:
 
 volumes:
   signals:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=10M
   images:
   logs:

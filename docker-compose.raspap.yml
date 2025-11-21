@@ -1,4 +1,3 @@
-version: "3.8"
 services:
   raspap:
     container_name: raspap
