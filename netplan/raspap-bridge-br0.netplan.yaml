@@ -3,9 +3,10 @@ network:
   renderer: networkd
   ethernets:
     end0:
-      dhcp4: no
-  bridges:
-    br0:
       dhcp4: yes
+      dhcp4-overrides:
+        use-dns: true
+        use-routes: true
+      link-local: []
       addresses: [192.168.153.15/24]
-      interfaces: [end0]
+      optional: true
