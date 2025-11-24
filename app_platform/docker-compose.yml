@@ -23,7 +23,7 @@ services:
     working_dir: /test
     volumes:
       - signals:/signals
-      - ./license:/license
+      - /opt/platform-builder/license:/license
       - ./settings/:/settings/
       - ./ccm.json:/app/ccm.json
       - ./pisp_config.yaml:/app/pisp_config.yaml
