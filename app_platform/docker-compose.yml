@@ -1,22 +1,4 @@
 services:
-  # client:
-  #   image: reg.fls-engineering.de/library/client:1.0.0a
-  #   env_file:
-  #     - .env
-  #   network_mode: host
-  siemensstern:
-    image: reg.fls-engineering.de/library/siemensstern:1.1.0
-    env_file:
-      - .env
-    environment:
-      - SIEMENS_SOCKET=ipc:///signals/app.0
-      - SIEMENS_TEMPLATE_PATH=/app/template.png
-      - SIEMENS_POSITION_DETECTION_INTERVAL=1
-      - SIEMENS_DEBUG=ON
-    volumes:
-      - signals:/signals
-      - ./template.png:/app/template.png
-    restart: unless-stopped
 
   camera:
     image: reg.fls-engineering.de/library/cam_v4l2:2.5.0
@@ -87,7 +69,7 @@ services:
       - identifier_file_path=/license/identifier.enc
       - license_file_path=/license/license.lic
       - ./history_images_directory=/history_images/
-      - app_active=True 
+      - app_active=False 
       - app_host=ipc:///signals/app.
       - csv_file=/history_images/app.csv
       - ftp_folder=/./trigger_images
