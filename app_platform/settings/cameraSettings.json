@@ -4,7 +4,7 @@
         "name": "9963793",
         "source": 0,
         "type": 0,
-        "value": 75944
+        "value": 106487
     },
     {
         "command": "set_value",
@@ -25,7 +25,7 @@
         "name": "10356995",
         "source": 0,
         "type": 0,
-        "value": 55698
+        "value": 19138
     },
     {
         "command": "set_value",
@@ -61,5 +61,19 @@
         "source": 3,
         "type": 3,
         "value": 23.0
+    },
+    {
+        "command": "set_value",
+        "name": "10026992",
+        "source": 0,
+        "type": 0,
+        "value": 0
+    },
+    {
+        "command": "set_value",
+        "name": "10026995",
+        "source": 0,
+        "type": 0,
+        "value": 21846
     }
 ]
