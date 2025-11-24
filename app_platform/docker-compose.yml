@@ -49,7 +49,7 @@ services:
       - /run/systemd/system:/run/systemd/system
       - /bin/systemctl:/bin/systemctl
       - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
-      - ./license:/license
+      - /opt/platform-builder/license:/license
       - ./settings:/settings
       - ./history_images:/history_images
       - ./trigger_images:/./trigger_images
@@ -116,3 +116,4 @@ volumes:
       o: size=10M
   images:
   logs:
+
