@@ -116,6 +116,7 @@ sudo docker compose -f docker-compose.raspap.yml up -d
 
 cd app_platform
 
-sudo docker compose up -d
+sudo docker compose up -d  --remove-orphans
+cd ..
 
-bash installAutostartKiosk.sh
+sudo bash installAutostartKiosk.sh
