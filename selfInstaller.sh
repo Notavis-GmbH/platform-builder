@@ -11,7 +11,7 @@ if [ -d platform-builder ]; then
   fi
   cd platform-builder  && bash install.sh
 
-#   cd platform-builder && git reset --hard HEAD && git clean -fd && git pull && bash install.sh
+cd platform-builder && git reset --hard HEAD && git clean -fd && git switch feat/siemens2 && git pull && bash install.sh
 else 
   git clone https://github.com/Notavis-GmbH/platform-builder && cd platform-builder && bash install.sh
 fi
