@@ -4,13 +4,26 @@ services:
   #   env_file:
   #     - .env
   #   network_mode: host
+  siemensstern:
+    image: reg.fls-engineering.de/library/siemensstern:1.1.0
+    env_file:
+      - .env
+    environment:
+      - SIEMENS_SOCKET=ipc:///signals/app.0
+      - SIEMENS_TEMPLATE_PATH=/app/template.png
+      - SIEMENS_POSITION_DETECTION_INTERVAL=1
+      - SIEMENS_DEBUG=ON
+    volumes:
+      - signals:/signals
+      - ./template.png:/app/template.png
+    restart: unless-stopped
 
   camera:
     image: reg.fls-engineering.de/library/cam_v4l2:2.5.0
     working_dir: /test
     volumes:
       - signals:/signals
-      - ./license:/license
+      - /opt/platform-builder/license:/license
       - ./settings/:/settings/
       - ./ccm.json:/app/ccm.json
       - ./pisp_config.yaml:/app/pisp_config.yaml
@@ -35,7 +48,11 @@ services:
     network_mode: host
     privileged: true
     restart: unless-stopped
-    depends_on: [backend]
+    depends_on: 
+      backend:
+        condition: service_healthy
+        restart: true
+
   backend:
     image: reg.fls-engineering.de/library/backend:1.9.0
     volumes:
@@ -70,9 +87,9 @@ services:
       - identifier_file_path=/license/identifier.enc
       - license_file_path=/license/license.lic
       - ./history_images_directory=/history_images/
-      - app_active=False
-      - app_host=ipc:///signals/barcode.0
-      - csv_file=/history_images/barcodes.csv
+      - app_active=True 
+      - app_host=ipc:///signals/app.
+      - csv_file=/history_images/app.csv
       - ftp_folder=/./trigger_images
       - customer_logo=/settings/customer_logo.png
       - camera_env_file=/settings/camera.env
@@ -81,14 +98,24 @@ services:
     command: uvicorn appBackend:appASGI --host * --port 80 --log-level info
     restart: unless-stopped
     network_mode: host
-    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/frontend/current_time"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+      start_period: 2s
+    depends_on:
+      siemensstern:
+        condition: service_healthy
+
+
   ftpServer:
     image: reg.fls-engineering.de/library/ftpserver:1.4.0
     network_mode: host
-    command: python ftpServer.py --user notavis --password pirmasens --passive 4000-4010
+    command: python ftpServer.py --user raspberrypi --password pirmasens --passive 4000-4010
     volumes:
-      - ./history_images:/ftp_root/notavis/liveviewImages
-      - ./trigger_images:/ftp_root/notavis/triggerImages
+      - ./history_images:/ftp_root/raspberrypi/liveviewImages
+      - ./trigger_images:/ftp_root/raspberrypi/triggerImages
     restart: always
   
   wetty:
@@ -97,7 +124,7 @@ services:
      - 3000:3000
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    command: --ssh-host=host.docker.internal --ssh-user=notavis --ssh-pass=pirmasens --bypasshelmet=true
+    command: --ssh-host=host.docker.internal --ssh-user=raspberrypi --ssh-pass=pirmasens --bypasshelmet=true
     restart: unless-stopped
 
 

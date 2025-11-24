@@ -1,0 +1,13 @@
+[Unit]
+Description=Firefox Kiosk Autostart
+After=graphical.target network-online.target
+
+[Service]
+User=raspberrypi
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/raspberrypi/.Xauthority
+ExecStart=/home/raspberrypi/.local/bin/start_kiosk.sh
+Restart=always
+
+[Install]
+WantedBy=graphical.target
