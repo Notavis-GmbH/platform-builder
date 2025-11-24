@@ -7,7 +7,6 @@ services:
       - signals:/signals
       - /opt/platform-builder/license:/license
       - ./settings/:/settings/
-      - ./ccm.json:/app/ccm.json
       - ./pisp_config.yaml:/app/pisp_config.yaml
     environment:
       - CAMERA_IPCPORT=ipc:///signals/cam.out.0
