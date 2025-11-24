@@ -10,3 +10,8 @@ network:
       link-local: []
       addresses: [192.168.153.15/24]
       optional: true
+    wlan0:
+      optional: true
+  bridges:
+    br0:
+      optional: true
