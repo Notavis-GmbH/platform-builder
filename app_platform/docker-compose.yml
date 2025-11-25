@@ -53,6 +53,7 @@ services:
       - ./settings:/settings
       - ./history_images:/history_images
       - ./trigger_images:/./trigger_images
+      - ./settings/users.json:/app/appBackend/users.json
 
 
     environment:

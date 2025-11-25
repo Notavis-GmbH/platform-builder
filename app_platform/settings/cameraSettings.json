@@ -4,7 +4,7 @@
         "name": "9963793",
         "source": 0,
         "type": 0,
-        "value": 106487
+        "value": 24969
     },
     {
         "command": "set_value",
@@ -25,7 +25,7 @@
         "name": "10356995",
         "source": 0,
         "type": 0,
-        "value": 19138
+        "value": 28219
     },
     {
         "command": "set_value",
@@ -53,14 +53,14 @@
         "name": "10026994",
         "source": 0,
         "type": 0,
-        "value": 60013
+        "value": 22813
     },
     {
         "command": "set_value",
         "name": "frameRate",
         "source": 3,
         "type": 3,
-        "value": 23.0
+        "value": 29.5
     },
     {
         "command": "set_value",
@@ -75,5 +75,33 @@
         "source": 0,
         "type": 0,
         "value": 21846
+    },
+    {
+        "command": "set_value",
+        "name": "9963787",
+        "source": 0,
+        "type": 0,
+        "value": 4717
+    },
+    {
+        "command": "set_value",
+        "name": "10026996",
+        "source": 0,
+        "type": 0,
+        "value": 0
+    },
+    {
+        "command": "set_value",
+        "name": "sharpnessCalculation",
+        "source": 3,
+        "type": 4,
+        "value": false
+    },
+    {
+        "command": "set_value",
+        "name": "Format",
+        "source": 3,
+        "type": 6,
+        "value": 1
     }
 ]

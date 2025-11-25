@@ -11,6 +11,8 @@ services:
     environment:
       - CAMERA_IPCPORT=ipc:///signals/cam.out.0
       - CAMERA_IPCPORTCONTROL=ipc:///signals/cam.control.0
+      #       - CAMERA_IPCPORT=tcp://192.168.1.32:5550
+      # - CAMERA_IPCPORTCONTROL=tcp://192.168.1.32:5540
       - CAMERA_DEVICE=/dev/video0
       - CAMERA_SENDJPG=ON
       - CAMERA_PERFORMANCE_TESTING=OFF
@@ -53,6 +55,7 @@ services:
       - ./settings:/settings
       - ./history_images:/history_images
       - ./trigger_images:/./trigger_images
+      - ./settings/users.json:/app/appBackend/users.json
 
 
     environment:
@@ -69,8 +72,8 @@ services:
       - license_file_path=/license/license.lic
       - ./history_images_directory=/history_images/
       - app_active=True 
-      - app_host=tcp://192.168.1.60:410
-      - _app_host=ipc:///signals/app.
+      - _app_host=tcp://192.168.1.60:410
+      - app_host=ipc:///signals/app.
       - csv_file=/history_images/app.csv
       - ftp_folder=/./trigger_images
       - customer_logo=/settings/customer_logo.png
@@ -114,11 +117,13 @@ services:
     environment:
       - SIEMENS_SOCKET=ipc:///signals/app.0
       - SIEMENS_TEMPLATE_PATH=/app/template.png
-      - SIEMENS_POSITION_DETECTION_INTERVAL=1
+      - SIEMENS_POSITION_DETECTION_INTERVAL=10
       - SIEMENS_DEBUG=ON
+      - SIEMENS_SETTINGS_FILENAME=/settings/siemenssternSettings.json
     volumes:
       - signals:/signals
       - ./template.png:/app/template.png
+      - ./settings/siemenssternSettings.json:/settings/siemenssternSettings.json
     restart: unless-stopped
 volumes:
   signals:
