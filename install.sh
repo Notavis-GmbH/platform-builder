@@ -115,7 +115,7 @@ cp resources/config.json ~/.docker/config.json
 sudo docker compose -f docker-compose.raspap.yml up -d
 
 cd app_platform
-
+sudo docker compose pull
 sudo docker compose up -d  --remove-orphans
 cd ..
 
