@@ -1,0 +1,132 @@
+services:
+
+  camera:
+    image: reg.fls-engineering.de/library/cam_v4l2:2.5.0
+    working_dir: /test
+    volumes:
+      - signals:/signals
+      - /opt/platform-builder/license:/license
+      - ./settings/:/settings/
+      - ./pisp_config.yaml:/app/pisp_config.yaml
+    environment:
+      - CAMERA_IPCPORT=ipc:///signals/cam.out.0
+      - CAMERA_IPCPORTCONTROL=ipc:///signals/cam.control.0
+      - CAMERA_DEVICE=/dev/video0
+      - CAMERA_SENDJPG=ON
+      - CAMERA_PERFORMANCE_TESTING=OFF
+      - CAMERA_FORCE_ROI=OFF
+      - CAMERA_IDENTIFIER_FILE_PATH=/license/identifier.enc
+      - CAMERA_LICENSE_FILE_PATH=/license/license.lic
+      - CAMERA_ALIGNMENT=32
+      - CAMERA_HAS_SUBDEV=ON
+      - CAMERA_SUBDEV_PATH=/dev/v4l-subdev2
+      - CAMERA_USE_ISP=OFF
+      - CAMERA_CONTROL_SETTINGSFILE=/settings/cameraSettings.json
+      - LIBCAMERA_RPI_CONFIG_FILE=/app/pisp_config.yaml
+      - CAMERA_TEST_MODE=OFF
+      - CAMERA_MAX_WIDTH_JPG=1000
+
+    network_mode: host
+    privileged: true
+    restart: unless-stopped
+    depends_on: 
+      backend:
+        condition: service_healthy
+        restart: true
+
+  backend:
+    image: reg.fls-engineering.de/library/backend:1.9.0
+    volumes:
+      - signals:/signals
+      - images:/images
+      - /proc/sysrq-trigger:/sysrq
+      - /boot/:/boot/
+      - ./ftp/:/ftp/
+      - ./settings/backendSettings.json:/app/appBackend/backendSettings.json
+      - ./settings/settings.json:/app/appBackend/settings.json
+      - ./settings/filterControls.json:/app/filterControls.json
+      - ./settings/runtimeSettings.json:/app/appBackend/runtimeSettings.json
+      - /run/systemd/system:/run/systemd/system
+      - /bin/systemctl:/bin/systemctl
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
+      - /opt/platform-builder/license:/license
+      - ./settings:/settings
+      - ./history_images:/history_images
+      - ./trigger_images:/./trigger_images
+
+
+    environment:
+      - base_folder_settings=/settings
+      - boot_config_file=/boot/firmware/config.txt
+      - boot_vc_config_file=/boot/firmware/config_vc-mipi-driver-bcm2712.txt
+      - status_file=/ftp/status.json
+      - camera_control_host=ipc:///signals/cam.control.
+      - camera_send_host=ipc:///signals/cam.out.
+      - ftp_settings_file=/ftp/ftpsettings.json
+      - webapp1_host=ipc:///signals/blobApp
+      - filterControl_file_path=/app/filterControls.json
+      - identifier_file_path=/license/identifier.enc
+      - license_file_path=/license/license.lic
+      - ./history_images_directory=/history_images/
+      - app_active=True 
+      - app_host=tcp://192.168.1.60:410
+      - _app_host=ipc:///signals/app.
+      - csv_file=/history_images/app.csv
+      - ftp_folder=/./trigger_images
+      - customer_logo=/settings/customer_logo.png
+      - camera_env_file=/settings/camera.env
+    privileged: true
+    working_dir: /app/appBackend
+    command: uvicorn appBackend:appASGI --host * --port 80 --log-level info
+    restart: unless-stopped
+    network_mode: host
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/frontend/current_time"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+      start_period: 2s
+
+
+
+  ftpServer:
+    image: reg.fls-engineering.de/library/ftpserver:1.4.0
+    network_mode: host
+    command: python ftpServer.py --user raspberrypi --password pirmasens --passive 4000-4010
+    volumes:
+      - ./history_images:/ftp_root/raspberrypi/liveviewImages
+      - ./trigger_images:/ftp_root/raspberrypi/triggerImages
+    restart: always
+  
+  wetty:
+    image: wettyoss/wetty:latest
+    ports:
+     - 3000:3000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: --ssh-host=host.docker.internal --ssh-user=raspberrypi --ssh-pass=pirmasens --bypasshelmet=true
+    restart: unless-stopped
+
+  siemensstern:
+    image: reg.fls-engineering.de/library/siemensstern:1.1.0
+    env_file:
+      - .env
+    environment:
+      - SIEMENS_SOCKET=ipc:///signals/app.0
+      - SIEMENS_TEMPLATE_PATH=/app/template.png
+      - SIEMENS_POSITION_DETECTION_INTERVAL=1
+      - SIEMENS_DEBUG=ON
+    volumes:
+      - signals:/signals
+      - ./template.png:/app/template.png
+    restart: unless-stopped
+volumes:
+  signals:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=10M
+  images:
+  logs:
+
