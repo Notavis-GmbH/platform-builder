@@ -11,6 +11,8 @@ services:
     environment:
       - CAMERA_IPCPORT=ipc:///signals/cam.out.0
       - CAMERA_IPCPORTCONTROL=ipc:///signals/cam.control.0
+      #       - CAMERA_IPCPORT=tcp://192.168.1.32:5550
+      # - CAMERA_IPCPORTCONTROL=tcp://192.168.1.32:5540
       - CAMERA_DEVICE=/dev/video0
       - CAMERA_SENDJPG=ON
       - CAMERA_PERFORMANCE_TESTING=OFF
@@ -70,6 +72,7 @@ services:
       - license_file_path=/license/license.lic
       - ./history_images_directory=/history_images/
       - app_active=True 
+      - _app_host=tcp://192.168.1.60:410
       - app_host=ipc:///signals/app.
       - csv_file=/history_images/app.csv
       - ftp_folder=/./trigger_images

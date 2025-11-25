@@ -14,5 +14,6 @@
 **/history_images/*.bmp
 **/history_images/*.tiff
 **/history_images/*.svg
-**/history_images/*.webp
+**/history_images/*.csv
+
 
