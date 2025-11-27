@@ -5,62 +5,145 @@ if [ "$(id -u)" -eq 0 ]; then
   exit 1
 fi
 
+echo "Starting platform installation..."
+
+# directory for per-step logs
+LOGDIR="$HOME/.platform_installer_logs"
+mkdir -p "$LOGDIR"
+
+# step counter
+STEP_NO=0
+
+# Color and symbol setup (UTF-8 symbols with ASCII fallback)
+GREEN="\033[0;32m"
+RED="\033[0;31m"
+YELLOW="\033[0;33m"
+BLUE="\033[0;34m"
+RESET="\033[0m"
+
+# Unicode symbols (fall back to ASCII if terminal doesn't support UTF-8)
+CHECK_MARK="\xE2\x9C\x94"  # ✔
+CROSS_MARK="\xE2\x9D\x96"  # ✖
+INFO_MARK="\xE2\x84\xB9"   # ℹ
+
+# Quick UTF-8 check: if locale doesn't support, use ASCII
+if ! printf "%b" "$CHECK_MARK" >/dev/null 2>&1; then
+    CHECK_MARK="[OK]"
+    CROSS_MARK="[FAIL]"
+    INFO_MARK="[i]"
+fi
+
+# run_step: run a command, redirect stdout/stderr to a per-step log file
+# usage: run_step "Title" "command to run"
+run_step() {
+    STEP_NO=$((STEP_NO+1))
+    local title="$1"
+    shift
+    local slug
+    slug=$(echo "$title" | tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]' '_' | sed 's/_\+/_/g' | sed 's/^_//;s/_$//')
+    local logfile="$LOGDIR/step_${STEP_NO}_${slug}.log"
+
+    echo
+    echo -e "${YELLOW}${INFO_MARK} Step ${STEP_NO}: ${title}...${RESET}"
+    echo -e "  -> writing output to ${BLUE}${logfile}${RESET}"
+
+    local rc
+    # Usage patterns:
+    # 1) run_step "Title" -- cmd arg1 arg2 ...   -> runs command directly (no shell parsing)
+    # 2) run_step "Title" "some complex shell string" -> legacy: runs via "bash -lc"
+    if [ "$#" -gt 0 ] && [ "$1" = "--" ]; then
+        shift
+        # execute command directly with its args (safer, no shell required)
+        "$@" >"$logfile" 2>&1
+        rc=$?
+    else
+        # legacy/string mode: join remaining args and run through shell
+        local cmd="$*"
+        bash -lc "$cmd" >"$logfile" 2>&1
+        rc=$?
+    fi
+
+    if [ $rc -eq 0 ]; then
+        echo -e "${GREEN}${CHECK_MARK} Step ${STEP_NO}: ${title} — SUCCESS${RESET}"
+        if [ "${INSTALLER_VERBOSE:-0}" -eq 1 ]; then
+            echo -e "${BLUE}Full log (${logfile}):${RESET}"
+            sed 's/^/  /' "$logfile"
+        else
+            echo -e "${BLUE}Log (last 5 lines):${RESET}"
+            tail -n 5 "$logfile" | sed 's/^/  /'
+        fi
+    else
+        echo -e "${RED}${CROSS_MARK} Step ${STEP_NO}: ${title} — FAILED (exit ${rc})${RESET}"
+        echo -e "${RED}Last 100 lines of log (${logfile}):${RESET}"
+        tail -n 100 "$logfile" | sed 's/^/  /'
+        echo -e "Full log available at: ${BLUE}${logfile}${RESET}"
+        return $rc
+    fi
+}
 # Install docker only if not already installed
+echo "Step 1: Checking Docker installation..."
 if ! command -v docker &> /dev/null; then
-    echo "Docker not found. Installing Docker..."
-    curl -fsSL https://get.docker.com/ | sh
-    sudo usermod -aG docker $USER
-    sudo mkdir -p /etc/docker
-    echo '{ "log-driver": "json-file", "log-opts": { "max-size": "10m" } }' | sudo tee /etc/docker/daemon.json
-    sudo systemctl ctl restart docker
+    run_step "Install Docker" "curl -fsSL https://get.docker.com/ | sh && sudo usermod -aG docker \$USER && sudo mkdir -p /etc/docker && echo '{ \"log-driver\": \"json-file\", \"log-opts\": { \"max-size\": \"10m\" } }' | sudo tee /etc/docker/daemon.json && sudo systemctl restart docker"
 else
     echo "Docker is already installed. Skipping Docker installation."
 fi
 
 # Install netplan for network configuration and configure system (as root)
-sudo -s << 'EOF'
-apt-get -y install netplan.io gh p7zip-full
+echo "Step 2: Configuring network and installing packages..."
+run_step "Install packages" "sudo apt-get -y install netplan.io gh p7zip-full"
+run_step "Copy netplan configuration" "sudo cp netplan/raspap-bridge-br0.netplan.yaml /etc/netplan/ && sudo chmod 600 /etc/netplan/raspap-bridge-br0.netplan.yaml"
+run_step "Apply netplan" "sudo netplan generate && sudo netplan apply"
+## iptables helper for raspap: use a shell function so run_step can call it directly
+setup_raspap_iptables() {
+sudo tee /etc/nftables.conf > /dev/null <<'EOF'
+table ip filter {
+    chain input { type filter hook input priority 0; policy accept; }
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+        # Accept established related
+        iifname "eth0" oifname "wlan0" ct state related,established accept
+        iifname "wlan0" oifname "eth0" accept
 
-cp netplan/raspap-bridge-br0.netplan.yaml /etc/netplan/
-chmod 600 /etc/netplan/raspap-bridge-br0.netplan.yaml
-netplan generate
-netplan apply
+        # Docker-User equivalent: allow traffic from eth0 -> wlan0
+        iifname "eth0" oifname "wlan0" accept
+    }
+}
 
-#For raspap
-iptables -I DOCKER-USER -i src_if -o dst_if -j ACCEPT
-iptables -t nat -C POSTROUTING -o end0 -j MASQUERADE || iptables -t nat -A POSTROUTING -o end0 -j MASQUERADE
-iptables -C FORWARD -i end0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT || iptables -A FORWARD -i end0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT
-iptables -C FORWARD -i wlan0 -o end0 -j ACCEPT || iptables -A FORWARD -i wlan0 -o end0 -j ACCEPT
-iptables-save > /dev/null
+table ip nat {
+    chain prerouting { type nat hook prerouting priority dstnat; policy accept; }
+    chain output { type nat hook output priority dstnat; policy accept; }
+    chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+        # Masquerade outgoing on end0
+        oifname "end0" masquerade
+    }
+}
 EOF
+
+sudo nft -f /etc/nftables.conf
+sudo systemctl enable --now nftables
+
+}
+
+run_step "Configure iptables for raspap" -- setup_raspap_iptables
 
 
 
 # Set WLAN country to Germany (for Debian 13/modern Raspberry Pi OS)
+echo "Step 3: Setting WLAN country to Germany..."
 if command -v raspi-config &> /dev/null; then
-    # Use raspi-config if available (Raspberry Pi OS)
-    sudo raspi-config nonint do_wifi_country DE
+    run_step "Set WLAN country (raspi-config)" "sudo raspi-config nonint do_wifi_country DE"
 else
-    # Fallback for other Debian systems - use iw regulatory domain
-    sudo iw reg set DE
-    # Make it persistent by setting in /etc/default/crda if the file exists
-    if [ -f /etc/default/crda ]; then
-        sudo sed -i '/^REGDOMAIN=/d' /etc/default/crda
-        echo 'REGDOMAIN=DE' | sudo tee -a /etc/default/crda
-    fi
-    # Also try the old wpa_supplicant method as fallback
-    if [ -f /etc/wpa_supplicant/wpa_supplicant.conf ]; then
-        sudo sed -i '/^country=/d' /etc/wpa_supplicant/wpa_supplicant.conf
-        echo 'country=DE' | sudo tee -a /etc/wpa_supplicant/wpa_supplicant.conf
-    fi
+    run_step "Set WLAN country (iw) and persist" "sudo iw reg set DE && if [ -f /etc/default/crda ]; then sudo sed -i '/^REGDOMAIN=/d' /etc/default/crda && echo 'REGDOMAIN=DE' | sudo tee -a /etc/default/crda; fi && if [ -f /etc/wpa_supplicant/wpa_supplicant.conf ]; then sudo sed -i '/^country=/d' /etc/wpa_supplicant/wpa_supplicant.conf && echo 'country=DE' | sudo tee -a /etc/wpa_supplicant/wpa_supplicant.conf; fi"
+    echo "WLAN country set using iw and configuration files."
 fi
 
 # Unblock Wi-Fi via rfkill and prevent blocking on boot
-sudo rfkill unblock wifi
-sudo systemctl mask rfkill.service
-sudo systemctl mask rfkill.socket
+echo "Step 4: Unblocking Wi-Fi..."
+run_step "Unblock Wi-Fi and mask rfkill" "sudo rfkill unblock wifi && sudo systemctl mask rfkill.service && sudo systemctl mask rfkill.socket"
 
 # Check libcamera version before building
+echo "Step 5: Checking and installing libcamera and rpicam-apps..."
 REQUIRED_LIBCAMERA_VERSION="v0.0.0+5323-42d5b620"
 REQUIRED_RPICAM_VERSION="v1.5.2"
 
@@ -80,14 +163,15 @@ if command -v libcamera-hello &> /dev/null; then
         echo "Correct libcamera and rpicam-apps versions are already installed. Skipping build."
     else
         echo "Version mismatch detected. Building libcamera and rpicam-apps..."
-        make all
+        run_step "Build libcamera and rpicam-apps" "make all"
     fi
 else
     echo "libcamera-hello not found. Building libcamera and rpicam-apps..."
-    make all
+    run_step "Build libcamera and rpicam-apps" "make all"
 fi
 
 # Check if vc-mipi-driver-bcm2712 is already installed with the correct version
+echo "Step 6: Checking and installing vc-mipi-driver..."
 REQUIRED_VERSION="0.6.7"
 PACKAGE_NAME="vc-mipi-driver-bcm2712"
 
@@ -99,24 +183,25 @@ if dpkg -l | grep -q "^ii  ${PACKAGE_NAME}"; then
         echo "${PACKAGE_NAME} version ${REQUIRED_VERSION} is already installed. Skipping installation."
     else
         echo "Installed version (${INSTALLED_VERSION}) does not match required version (${REQUIRED_VERSION}). Updating..."
-        wget -N --timestamping https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v0.6.7/vc-mipi-driver-bcm2712_0.6.7_arm64.deb
-        sudo apt install ./vc-mipi-driver-bcm2712_0.6.7_arm64.deb -y
+        run_step "Install vc-mipi-driver (update)" "wget -N --timestamping https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v0.6.7/vc-mipi-driver-bcm2712_0.6.7_arm64.deb && sudo apt install ./vc-mipi-driver-bcm2712_0.6.7_arm64.deb -y"
     fi
 else
     echo "${PACKAGE_NAME} is not installed. Installing version ${REQUIRED_VERSION}..."
-    wget -N --timestamping https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v0.6.7/vc-mipi-driver-bcm2712_0.6.7_arm64.deb
-    sudo apt install ./vc-mipi-driver-bcm2712_0.6.7_arm64.deb -y
+    run_step "Install vc-mipi-driver" "wget -N --timestamping https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v0.6.7/vc-mipi-driver-bcm2712_0.6.7_arm64.deb && sudo apt install ./vc-mipi-driver-bcm2712_0.6.7_arm64.deb -y"
 fi
 
 # Add log limit to 10 mb for docker globally
-mkdir -p ~/.docker/
-cp resources/config.json ~/.docker/config.json
+echo "Step 7: Configuring Docker logging..."
+run_step "Configure Docker logging" "mkdir -p ~/.docker/ && cp resources/config.json ~/.docker/config.json"
 
-sudo docker compose -f docker-compose.raspap.yml up -d
+echo "Step 8: Starting raspap services..."
+run_step "Start raspap services" "sudo docker compose -f docker-compose.raspap.yml up -d"
 
-cd app_platform
-sudo docker compose pull
-sudo docker compose up -d  --remove-orphans
-cd ..
+echo "Step 9: Starting app platform services..."
+run_step "Pull app platform images" "cd app_platform && sudo docker compose pull"
+run_step "Start app platform services" "cd app_platform && sudo docker compose up -d --remove-orphans"
 
-sudo bash installAutostartKiosk.sh
+echo "Step 10: Installing autostart kiosk..."
+run_step "Install autostart kiosk" "sudo bash installAutostartKiosk.sh"
+
+echo "Platform installation completed successfully!"
