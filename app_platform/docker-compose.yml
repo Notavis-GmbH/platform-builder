@@ -76,7 +76,7 @@ services:
       - ftp_folder=/./trigger_images
       - customer_logo=/settings/customer_logo.png
       - camera_env_file=/settings/camera.env
-      - parameters_login_needed=False
+      - parameters_login_needed=True
     privileged: true
     working_dir: /app/appBackend
     command: uvicorn appBackend:appASGI --host * --port 80 --log-level info
@@ -119,5 +119,6 @@ volumes:
       o: size=10M
   images:
   logs:
+
 
 
