@@ -3,12 +3,8 @@ network:
   renderer: networkd
   ethernets:
     end0:
-      dhcp4: yes
-      dhcp4-overrides:
-        use-dns: true
-        use-routes: true
-      link-local: []
-      addresses: [192.168.153.15/24]
+      dhcp4: true
+      link-local: [ipv4]   # Erlaube automatisch 169.254.x.x wenn DHCP fehlt
       optional: true
     wlan0:
       optional: true
