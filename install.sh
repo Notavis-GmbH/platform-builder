@@ -201,7 +201,23 @@ echo "Step 9: Starting app platform services..."
 run_step "Pull app platform images" "cd app_platform && sudo docker compose pull"
 run_step "Start app platform services" "cd app_platform && sudo docker compose up -d --remove-orphans"
 
-echo "Step 10: Installing autostart kiosk..."
-run_step "Install autostart kiosk" "sudo bash installAutostartKiosk.sh"
+echo "Step 10: Uninstalling autostart kiosk..."
+run_step "Uninstall autostart kiosk" "sudo bash uninstallAutostartKiosk.sh"
+
+# Archive installer logs and copy to /var/log/platform-installer for diagnostics
+archive_installer_logs() {
+    TS=$(date +%Y%m%d-%H%M%S)
+    TAR="$HOME/platform_install_logs_${TS}.tar.gz"
+    if [ -d "$LOGDIR" ]; then
+        tar -czf "$TAR" -C "$LOGDIR" .
+        sudo mkdir -p /var/log/platform-installer
+        sudo cp "$TAR" /var/log/platform-installer/
+        echo "Archived installer logs to $TAR and copied to /var/log/platform-installer/"
+    else
+        echo "No installer logs found at $LOGDIR"
+    fi
+}
+
+run_step "Archive installer logs" -- archive_installer_logs
 
 echo "Platform installation completed successfully!"
