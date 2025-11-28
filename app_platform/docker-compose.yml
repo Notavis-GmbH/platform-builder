@@ -36,7 +36,7 @@ services:
         restart: true
 
   backend:
-    image: reg.fls-engineering.de/library/backend:1.9.1
+    image: reg.fls-engineering.de/library/backend:1.9.2
     volumes:
       - signals:/signals
       - images:/images
@@ -56,8 +56,6 @@ services:
       - ./trigger_images:/./trigger_images
       - ./settings/users.json:/app/appBackend/users.json
       - ./dump:/dump
-      - ./IPCHelper.py:/app/Helpers/IPCHelper.py
-
 
     environment:
       - base_folder_settings=/settings
@@ -121,4 +119,5 @@ volumes:
       o: size=10M
   images:
   logs:
+
 
