@@ -422,14 +422,14 @@ class SocketInterface:
                         if isinstance(messages, list) and len(messages) > 1:
                             image_pack["data"] = messages[1]
                         if isinstance(messages, list) and len(messages) > 2:                        
-                            image_pack["base64"] = messages[2]
+                            image_pack["base64"] = messages[2].decode()
                         
                     else:
                         image_pack = json.loads(messages[0])
                         if isinstance(messages, list) and len(messages) > 1:
-                            image_pack["data"] = str(messages[1])
+                            image_pack["data"] = messages[1]
                         if isinstance(messages, list) and len(messages) > 2:                        
-                            image_pack["base64"] = str(messages[2])
+                            image_pack["base64"] = messages[2].decode()
                     # if (not "data" in image_pack):             
                     #     logger.info(f"Found key {image_pack}")
 
