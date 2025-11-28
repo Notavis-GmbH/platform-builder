@@ -17,7 +17,7 @@
         "source": 3,
         "step": 1,
         "type": 0,
-        "value": 10,
+        "value": 2,
         "visible": true,
         "writeableStandby": false
     },
@@ -61,7 +61,7 @@
         "source": 3,
         "step": 0.1,
         "type": 3,
-        "value": 0.2,
+        "value": 0.5,
         "visible": true,
         "writeableStandby": false
     },
@@ -83,7 +83,7 @@
         "source": 3,
         "step": true,
         "type": 4,
-        "value": false,
+        "value": true,
         "visible": true,
         "writeableStandby": false
     }

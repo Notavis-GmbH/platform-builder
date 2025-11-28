@@ -1,7 +1,7 @@
 services:
 
   camera:
-    image: reg.fls-engineering.de/library/cam_v4l2:2.5.0
+    image: reg.fls-engineering.de/library/cam_v4l2:2.6.0
     working_dir: /test
     volumes:
       - signals:/signals
@@ -27,6 +27,7 @@ services:
       - LIBCAMERA_RPI_CONFIG_FILE=/app/pisp_config.yaml
       - CAMERA_TEST_MODE=OFF
       - CAMERA_MAX_WIDTH_JPG=1000
+      - CAMERA_SENDJPG=FALSE
 
     network_mode: host
     privileged: true
@@ -37,7 +38,7 @@ services:
         restart: true
 
   backend:
-    image: reg.fls-engineering.de/library/backend:1.9.0
+    image: reg.fls-engineering.de/library/backend:1.9.1
     volumes:
       - signals:/signals
       - images:/images
@@ -56,6 +57,7 @@ services:
       - ./history_images:/history_images
       - ./trigger_images:/./trigger_images
       - ./settings/users.json:/app/appBackend/users.json
+      - ./dump:/dump
 
 
     environment:
