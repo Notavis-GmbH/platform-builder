@@ -96,26 +96,26 @@ run_step "Apply netplan" "sudo netplan generate && sudo netplan apply"
 ## iptables helper for raspap: use a shell function so run_step can call it directly
 setup_raspap_iptables() {
 sudo tee /etc/nftables.conf > /dev/null <<'EOF'
-table ip filter {
-    chain input { type filter hook input priority 0; policy accept; }
-    chain forward {
-        type filter hook forward priority 0; policy drop;
-        # Accept established related
-        iifname "eth0" oifname "wlan0" ct state related,established accept
-        iifname "wlan0" oifname "eth0" accept
-
-        # Docker-User equivalent: allow traffic from eth0 -> wlan0
-        iifname "eth0" oifname "wlan0" accept
-    }
-}
-
 table ip nat {
-    chain prerouting { type nat hook prerouting priority dstnat; policy accept; }
-    chain output { type nat hook output priority dstnat; policy accept; }
+    chain prerouting {
+        type nat hook prerouting priority -100; policy accept;
+    }
+
+    chain output {
+        type nat hook output priority -100; policy accept;
+    }
+
     chain postrouting {
-        type nat hook postrouting priority srcnat; policy accept;
-        # Masquerade outgoing on end0
+        type nat hook postrouting priority 100; policy accept;
+
+        # Dein Masquerade für end0
         oifname "end0" masquerade
+
+        # Docker-Subnetze Masqueraden
+        ip saddr 172.17.0.0/16 oifname != "docker0" masq
+        ip saddr 172.18.0.0/16 oifname != "docker0" masq
+        ip saddr 172.19.0.0/16 oifname != "docker0" masq
+        ip saddr 192.168.0.0/16 oifname != "docker0" masq
     }
 }
 EOF
