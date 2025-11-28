@@ -56,6 +56,7 @@ services:
       - ./trigger_images:/./trigger_images
       - ./settings/users.json:/app/appBackend/users.json
       - ./dump:/dump
+      - ./IPCHelper.py:/app/Helpers/IPCHelper.py
 
 
     environment:
