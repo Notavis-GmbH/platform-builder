@@ -51,20 +51,66 @@ run_step() {
     # Usage patterns:
     # 1) run_step "Title" -- cmd arg1 arg2 ...   -> runs command directly (no shell parsing)
     # 2) run_step "Title" "some complex shell string" -> legacy: runs via "bash -lc"
+
+    # Start the command in background so we can show a spinner while it runs
     if [ "$#" -gt 0 ] && [ "$1" = "--" ]; then
         shift
-        # execute command directly with its args (safer, no shell required)
-        "$@" >"$logfile" 2>&1
-        rc=$?
+        ("$@") >"$logfile" 2>&1 &
+        cmd_pid=$!
     else
-        # legacy/string mode: join remaining args and run through shell
         local cmd="$*"
-        bash -lc "$cmd" >"$logfile" 2>&1
-        rc=$?
+        bash -lc "$cmd" >"$logfile" 2>&1 &
+        cmd_pid=$!
     fi
 
+    # spinner with elapsed time
+    local spinner_chars=( '|' '/' '-' '\\' )
+    local i=0
+    local start_ts
+    start_ts=$(date +%s)
+    printf ""
+    while kill -0 "$cmd_pid" >/dev/null 2>&1; do
+        local now elapsed elapsed_fmt ch
+        now=$(date +%s)
+        elapsed=$((now - start_ts))
+        if [ "$elapsed" -ge 3600 ]; then
+            local hours=$((elapsed/3600))
+            local mins=$((elapsed%3600/60))
+            local secs=$((elapsed%60))
+            elapsed_fmt=$(printf "%d:%02d:%02d" "$hours" "$mins" "$secs")
+        else
+            local mins=$((elapsed/60))
+            local secs=$((elapsed%60))
+            elapsed_fmt=$(printf "%02d:%02d" "$mins" "$secs")
+        fi
+        ch=${spinner_chars[i]}
+        i=$(( (i + 1) % ${#spinner_chars[@]} ))
+        echo -ne "\r  ${YELLOW}${INFO_MARK} Step ${STEP_NO}: ${title} ... ${ch} (${elapsed_fmt}) ${RESET}"
+        sleep ${INSTALLER_SPINNER_INTERVAL:-0.12}
+    done
+
+    # wait for process and capture exit code
+    wait "$cmd_pid" 2>/dev/null || true
+    rc=$?
+
+    # compute total elapsed and clear spinner line
+    local end_ts total_elapsed total_fmt
+    end_ts=$(date +%s)
+    total_elapsed=$((end_ts - start_ts))
+    if [ "$total_elapsed" -ge 3600 ]; then
+        local th=$((total_elapsed/3600))
+        local tm=$((total_elapsed%3600/60))
+        local ts=$((total_elapsed%60))
+        total_fmt=$(printf "%d:%02d:%02d" "$th" "$tm" "$ts")
+    else
+        local tm=$((total_elapsed/60))
+        local ts=$((total_elapsed%60))
+        total_fmt=$(printf "%02d:%02d" "$tm" "$ts")
+    fi
+    echo -ne "\r\033[K"
+
     if [ $rc -eq 0 ]; then
-        echo -e "${GREEN}${CHECK_MARK} Step ${STEP_NO}: ${title} — SUCCESS${RESET}"
+        echo -e "${GREEN}${CHECK_MARK} Step ${STEP_NO}: ${title} — SUCCESS (${total_fmt})${RESET}"
         if [ "${INSTALLER_VERBOSE:-0}" -eq 1 ]; then
             echo -e "${BLUE}Full log (${logfile}):${RESET}"
             sed 's/^/  /' "$logfile"
@@ -73,7 +119,7 @@ run_step() {
             tail -n 5 "$logfile" | sed 's/^/  /'
         fi
     else
-        echo -e "${RED}${CROSS_MARK} Step ${STEP_NO}: ${title} — FAILED (exit ${rc})${RESET}"
+        echo -e "${RED}${CROSS_MARK} Step ${STEP_NO}: ${title} — FAILED (exit ${rc}) (${total_fmt})${RESET}"
         echo -e "${RED}Last 100 lines of log (${logfile}):${RESET}"
         tail -n 100 "$logfile" | sed 's/^/  /'
         echo -e "Full log available at: ${BLUE}${logfile}${RESET}"
