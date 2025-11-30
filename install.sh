@@ -141,10 +141,27 @@ run_step "Copy netplan configuration" "sudo cp netplan/raspap-bridge-br0.netplan
 run_step "Apply netplan" "sudo netplan generate && sudo netplan apply"
 
 # Configure Avahi to only listen on the bridge interface 'end0'
-run_step "Configure Avahi allowed interfaces" -- bash -c 'TS=$(date +%Y%m%d-%H%M%S) && sudo cp /etc/avahi/avahi-daemon.conf /etc/avahi/avahi-daemon.conf.$TS.bak && sudo awk '
-'"'"'BEGIN{inserted=0; in_server=0} /^
-'"'"'\[server\]/{print; in_server=1; next} /^
-'"'"'\[/{ if(in_server && !inserted){ print "allow-interfaces=end0"; inserted=1 } in_server=0; print; next} { if($0 ~ /^[[:space:]]*#?[[:space:]]*allow-interfaces=/) next; print } END{ if(!inserted){ if(!in_server){ print "[server]" } print "allow-interfaces=end0" } }'"'"' /etc/avahi/avahi-daemon.conf | sudo tee /etc/avahi/avahi-daemon.conf > /dev/null && sudo systemctl restart avahi-daemon'
+configure_avahi() {
+    TS=$(date +%Y%m%d-%H%M%S)
+    sudo cp /etc/avahi/avahi-daemon.conf /etc/avahi/avahi-daemon.conf."$TS".bak
+    # If any allow-interfaces line exists (commented or not), replace it
+    if sudo grep -q '^[[:space:]]*#\?[[:space:]]*allow-interfaces=' /etc/avahi/avahi-daemon.conf; then
+        sudo sed -i 's/^[[:space:]]*#\?[[:space:]]*allow-interfaces=.*/allow-interfaces=end0/' /etc/avahi/avahi-daemon.conf
+    else
+        # Use awk to insert the setting immediately after the first [server] header.
+        # If no [server] section exists, append a new section at EOF.
+        sudo awk '
+            BEGIN{added=0}
+            /^\[server\]/{print; print "allow-interfaces=end0"; added=1; next}
+            {print}
+            END{if(!added){print "\n[server]"; print "allow-interfaces=end0"}}' /etc/avahi/avahi-daemon.conf | sudo tee /etc/avahi/avahi-daemon.conf.tmp >/dev/null && sudo mv /etc/avahi/avahi-daemon.conf.tmp /etc/avahi/avahi-daemon.conf
+    fi
+
+    # Ensure Avahi is restarted to apply changes
+    sudo systemctl restart avahi-daemon
+}
+
+run_step "Configure Avahi allowed interfaces" -- configure_avahi
 ## iptables helper for raspap: use a shell function so run_step can call it directly
 setup_raspap_iptables() {
 sudo tee /etc/nftables.conf > /dev/null <<'EOF'
