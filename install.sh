@@ -139,6 +139,12 @@ echo "Step 2: Configuring network and installing packages..."
 run_step "Install packages" "sudo apt-get -y install netplan.io gh p7zip-full"
 run_step "Copy netplan configuration" "sudo cp netplan/raspap-bridge-br0.netplan.yaml /etc/netplan/ && sudo chmod 600 /etc/netplan/raspap-bridge-br0.netplan.yaml"
 run_step "Apply netplan" "sudo netplan generate && sudo netplan apply"
+
+# Configure Avahi to only listen on the bridge interface 'end0'
+run_step "Configure Avahi allowed interfaces" -- bash -c 'TS=$(date +%Y%m%d-%H%M%S) && sudo cp /etc/avahi/avahi-daemon.conf /etc/avahi/avahi-daemon.conf.$TS.bak && sudo awk '
+'"'"'BEGIN{inserted=0; in_server=0} /^
+'"'"'\[server\]/{print; in_server=1; next} /^
+'"'"'\[/{ if(in_server && !inserted){ print "allow-interfaces=end0"; inserted=1 } in_server=0; print; next} { if($0 ~ /^[[:space:]]*#?[[:space:]]*allow-interfaces=/) next; print } END{ if(!inserted){ if(!in_server){ print "[server]" } print "allow-interfaces=end0" } }'"'"' /etc/avahi/avahi-daemon.conf | sudo tee /etc/avahi/avahi-daemon.conf > /dev/null && sudo systemctl restart avahi-daemon'
 ## iptables helper for raspap: use a shell function so run_step can call it directly
 setup_raspap_iptables() {
 sudo tee /etc/nftables.conf > /dev/null <<'EOF'
