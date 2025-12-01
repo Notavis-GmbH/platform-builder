@@ -11,6 +11,8 @@ services:
     environment:
       - CAMERA_IPCPORT=ipc:///signals/cam.out.0
       - CAMERA_IPCPORTCONTROL=ipc:///signals/cam.control.0
+      #       - CAMERA_IPCPORT=tcp://192.168.1.32:5550
+      # - CAMERA_IPCPORTCONTROL=tcp://192.168.1.32:5540
       - CAMERA_DEVICE=/dev/video0
       - CAMERA_SENDJPG=ON
       - CAMERA_PERFORMANCE_TESTING=OFF
@@ -25,7 +27,7 @@ services:
       - LIBCAMERA_RPI_CONFIG_FILE=/app/pisp_config.yaml
       - CAMERA_TEST_MODE=OFF
       - CAMERA_MAX_WIDTH_JPG=1000
-      - CAMERA_SENDJPG=ON
+      - CAMERA_SENDJPG=FALSE
       - CAMERA_SETCONTROLS_AT_RESUME=ON
     network_mode: host
     privileged: true
@@ -72,14 +74,13 @@ services:
       - identifier_file_path=/license/identifier.enc
       - license_file_path=/license/license.lic
       - ./history_images_directory=/history_images/
-      - app_active=False 
+      - app_active=True 
+      - _app_host=tcp://192.168.1.60:410
       - app_host=ipc:///signals/app.
       - csv_file=/history_images/app.csv
       - ftp_folder=/./trigger_images
       - customer_logo=/settings/customer_logo.png
       - camera_env_file=/settings/camera.env
-      - parameters_login_needed=True
-      - version_file=/version_info/build_info.json
     privileged: true
     working_dir: /app/appBackend
     command: uvicorn appBackend:appASGI --host * --port 80 --log-level info
@@ -112,7 +113,21 @@ services:
     command: --ssh-host=host.docker.internal --ssh-user=raspberrypi --ssh-pass=pirmasens --bypasshelmet=true
     restart: unless-stopped
 
- 
+  siemensstern:
+    image: reg.fls-engineering.de/library/siemensstern:1.1.0
+    env_file:
+      - .env
+    environment:
+      - SIEMENS_SOCKET=ipc:///signals/app.0
+      - SIEMENS_TEMPLATE_PATH=/app/template.png
+      - SIEMENS_POSITION_DETECTION_INTERVAL=10
+      - SIEMENS_DEBUG=ON
+      - SIEMENS_SETTINGS_FILENAME=/settings/siemenssternSettings.json
+    volumes:
+      - signals:/signals
+      - ./template.png:/app/template.png
+      - ./settings/siemenssternSettings.json:/settings/siemenssternSettings.json
+    restart: unless-stopped
 volumes:
   signals:
     driver: local

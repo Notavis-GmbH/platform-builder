@@ -1,5 +1,5 @@
 #!/bin/bash
-branch="master"
+branch="feat/siemens2"
 user=$(whoami)
 cd  ~
 if [ -d platform-builder ]; then 
