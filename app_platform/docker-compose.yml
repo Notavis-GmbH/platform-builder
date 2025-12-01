@@ -59,8 +59,10 @@ services:
       - ./settings/users.json:/app/appBackend/users.json
       - ./dump:/dump
       - ./var:/version_info
-
-
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
+    cap_add:
+      - SYS_BOOT
+      - SYS_ADMIN
     environment:
       - base_folder_settings=/settings
       - boot_config_file=/boot/firmware/config.txt
@@ -81,6 +83,8 @@ services:
       - ftp_folder=/./trigger_images
       - customer_logo=/settings/customer_logo.png
       - camera_env_file=/settings/camera.env
+      - parameters_login_needed=True
+      - version_file=/version_info/build_info.json
     privileged: true
     working_dir: /app/appBackend
     command: uvicorn appBackend:appASGI --host * --port 80 --log-level info
