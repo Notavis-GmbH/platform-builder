@@ -1,7 +1,7 @@
 services:
 
   camera:
-    image: reg.fls-engineering.de/library/cam_v4l2:2.6.0
+    image: reg.fls-engineering.de/library/cam_v4l2:2.5.0
     working_dir: /test
     volumes:
       - signals:/signals
@@ -53,9 +53,11 @@ services:
       - /opt/platform-builder/license:/license
       - ./settings:/settings
       - ./history_images:/history_images
-      - ./trigger_images:/./trigger_images
+      - ./trigger_images:/trigger_images
       - ./settings/users.json:/app/appBackend/users.json
       - ./dump:/dump
+      - ./var:/version_info
+
 
     environment:
       - base_folder_settings=/settings
@@ -77,6 +79,7 @@ services:
       - customer_logo=/settings/customer_logo.png
       - camera_env_file=/settings/camera.env
       - parameters_login_needed=True
+      - version_file=/version_info/build_info.json
     privileged: true
     working_dir: /app/appBackend
     command: uvicorn appBackend:appASGI --host * --port 80 --log-level info
@@ -119,6 +122,3 @@ volumes:
       o: size=10M
   images:
   logs:
-
-
-

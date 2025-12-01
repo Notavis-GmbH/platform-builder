@@ -1,7 +1,7 @@
 services:
 
   camera:
-    image: reg.fls-engineering.de/library/cam_v4l2:2.6.0
+    image: reg.fls-engineering.de/library/cam_v4l2:2.5.0
     working_dir: /test
     volumes:
       - signals:/signals
@@ -28,7 +28,7 @@ services:
       - CAMERA_TEST_MODE=OFF
       - CAMERA_MAX_WIDTH_JPG=1000
       - CAMERA_SENDJPG=FALSE
-
+      - CAMERA_SETCONTROLS_AT_RESUME=ON
     network_mode: host
     privileged: true
     restart: unless-stopped
@@ -38,7 +38,7 @@ services:
         restart: true
 
   backend:
-    image: reg.fls-engineering.de/library/backend:1.9.1
+    image: reg.fls-engineering.de/library/backend:1.9.2
     volumes:
       - signals:/signals
       - images:/images
@@ -55,9 +55,10 @@ services:
       - /opt/platform-builder/license:/license
       - ./settings:/settings
       - ./history_images:/history_images
-      - ./trigger_images:/./trigger_images
+      - ./trigger_images:/trigger_images
       - ./settings/users.json:/app/appBackend/users.json
       - ./dump:/dump
+      - ./var:/version_info
 
 
     environment:
@@ -136,4 +137,3 @@ volumes:
       o: size=10M
   images:
   logs:
-
