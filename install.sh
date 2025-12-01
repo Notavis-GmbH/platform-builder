@@ -289,4 +289,93 @@ archive_installer_logs() {
 
 run_step "Archive installer logs" -- archive_installer_logs
 
+# Record git commit and docker image versions to a JSON file for FastAPI to read
+record_build_info() {
+    TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    # write into app_platform/var so the backend can mount/read it via ./var:/version_info
+    BUILD_FILE="app_platform/var/build_info.json"
+    mkdir -p "$(dirname "$BUILD_FILE")"
+
+    GIT_COMMIT=$(git rev-parse --verify --short HEAD 2>/dev/null || echo "")
+    GIT_FULL_COMMIT=$(git rev-parse --verify HEAD 2>/dev/null || echo "")
+    GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+    GIT_REMOTE=$(git config --get remote.origin.url 2>/dev/null || echo "")
+
+    images_json="[]"
+    compose_file="app_platform/docker-compose.yml"
+    if [ -f "$compose_file" ]; then
+        # extract image: lines (ignore commented lines) and trim quotes
+        mapfile -t compose_images < <(
+            grep -E '^[[:space:]]*image:' "$compose_file" \
+            | sed -E 's/^[[:space:]]*image:[[:space:]]*//' \
+            | sed "s/[\"']//g" \
+            | sed 's/[[:space:]]*$//' \
+            | sort -u
+        )
+    else
+        compose_images=()
+    fi
+
+    if [ "${#compose_images[@]}" -ne 0 ]; then
+        images_array=()
+        if command -v docker >/dev/null 2>&1; then
+            # get local images once
+            mapfile -t local_lines < <(docker images --format '{{.Repository}}:::{{.Tag}}:::{{.ID}}' | sort -u)
+        else
+            local_lines=()
+        fi
+
+        for img in "${compose_images[@]}"; do
+            # normalize image (trim)
+            img=$(printf '%s' "$img" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+            # parse repo and tag from the compose image string
+            if echo "$img" | grep -q ':'; then
+                repo="${img%:*}"
+                tag="${img##*:}"
+            else
+                repo="$img"
+                tag=""
+            fi
+
+            id=""
+            present=false
+            if command -v docker >/dev/null 2>&1; then
+                # attempt to find local image by exact repo:tag match
+                id=$(docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | awk -v img="$img" '$1==img {print $2; exit}') || true
+                if [ -n "$id" ]; then
+                    present=true
+                fi
+            fi
+
+            # escape values for JSON
+            repo_esc=$(printf '%s' "$repo" | sed 's/"/\\"/g')
+            tag_esc=$(printf '%s' "$tag" | sed 's/"/\\"/g')
+            id_esc=$(printf '%s' "$id" | sed 's/"/\\"/g')
+            present_flag=$([[ "$present" = true ]] && echo true || echo false)
+
+            images_array+=("{\"image\":\"$(printf '%s' "$img" | sed 's/"/\\"/g')\",\"repository\":\"$repo_esc\",\"tag\":\"$tag_esc\",\"id\":\"$id_esc\",\"present_locally\":$present_flag}")
+        done
+
+        images_json=$(printf '[%s]' "$(IFS=,; echo "${images_array[*]}")")
+    fi
+
+    cat > "$BUILD_FILE" <<EOF
+{
+  "timestamp": "$TS",
+  "git": {
+    "commit": "$GIT_COMMIT",
+    "commit_full": "$GIT_FULL_COMMIT",
+    "branch": "$GIT_BRANCH",
+    "remote": "$GIT_REMOTE"
+  },
+  "docker_images": $images_json
+}
+EOF
+
+    echo "Wrote build info to $BUILD_FILE"
+}
+
+run_step "Record build metadata" -- record_build_info
+
 echo "Platform installation completed successfully!"
