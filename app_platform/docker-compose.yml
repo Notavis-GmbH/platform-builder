@@ -57,8 +57,10 @@ services:
       - ./settings/users.json:/app/appBackend/users.json
       - ./dump:/dump
       - ./var:/version_info
-
-
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
+    cap_add:
+      - SYS_BOOT
+      - SYS_ADMIN
     environment:
       - base_folder_settings=/settings
       - boot_config_file=/boot/firmware/config.txt
