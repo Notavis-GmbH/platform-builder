@@ -270,8 +270,8 @@ echo "Step 9: Starting app platform services..."
 run_step "Pull app platform images" "cd app_platform && sudo docker compose pull"
 run_step "Start app platform services" "cd app_platform && sudo docker compose up -d --remove-orphans"
 
-echo "Step 10: Uninstalling autostart kiosk..."
-run_step "Uninstall autostart kiosk" "sudo bash uninstallAutostartKiosk.sh"
+echo "Step 10: Install autostart kiosk..."
+run_step "Install autostart kiosk" "sudo bash installAutostartKiosk.sh"
 
 # Archive installer logs and copy to /var/log/platform-installer for diagnostics
 archive_installer_logs() {
@@ -318,9 +318,9 @@ record_build_info() {
 
     if [ "${#compose_images[@]}" -ne 0 ]; then
         images_array=()
-        if command -v docker >/dev/null 2>&1; then
+        if command -v sudo docker >/dev/null 2>&1; then
             # get local images once
-            mapfile -t local_lines < <(docker images --format '{{.Repository}}:::{{.Tag}}:::{{.ID}}' | sort -u)
+            mapfile -t local_lines < <(sudo docker images --format '{{.Repository}}:::{{.Tag}}:::{{.ID}}' | sort -u)
         else
             local_lines=()
         fi
@@ -340,9 +340,9 @@ record_build_info() {
 
             id=""
             present=false
-            if command -v docker >/dev/null 2>&1; then
+            if command -v sudo docker >/dev/null 2>&1; then
                 # attempt to find local image by exact repo:tag match
-                id=$(docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | awk -v img="$img" '$1==img {print $2; exit}') || true
+                id=$(sudo docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | awk -v img="$img" '$1==img {print $2; exit}') || true
                 if [ -n "$id" ]; then
                     present=true
                 fi
