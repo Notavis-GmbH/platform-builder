@@ -268,7 +268,7 @@ run_step "Start raspap services" "sudo docker compose -f docker-compose.raspap.y
 
 echo "Step 9: Starting app platform services..."
 run_step "Pull app platform images" "cd app_platform && sudo docker compose pull"
-run_step "Start app platform services" "cd app_platform && sudo docker compose up -d --remove-orphans"
+run_step "Start app platform services" "cd app_platform && sudo docker compose down &&  sudo docker compose up -d --remove-orphans"
 
 echo "Step 10: Install autostart kiosk..."
 run_step "Install autostart kiosk" "sudo bash installAutostartKiosk.sh"
