@@ -36,7 +36,8 @@
         "Horizontal Blanking",
         "#Analogue Gain",
         "Roi Position",
-        "Live Roi"
+        "Live Roi",
+        "Frame Rate"
     ],
     "maxValues": {
         "Exposure": 500000,
