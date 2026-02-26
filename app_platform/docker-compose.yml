@@ -38,7 +38,7 @@ services:
         restart: true
 
   backend:
-    image: reg.fls-engineering.de/library/backend:1.9.2
+    image: reg.fls-engineering.de/library/backend:1.9.3
     volumes:
       - signals:/signals
       - images:/images
@@ -141,4 +141,5 @@ volumes:
       o: size=10M
   images:
   logs:
+
 
