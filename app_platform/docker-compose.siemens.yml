@@ -1,7 +1,36 @@
 services:
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - ftdi-network
+  ftdi_service_hardware:
+    image: reg.fls-engineering.de/library/ftdi:2.0.0
 
+    networks:
+      - ftdi-network
+    working_dir: /app
+    volumes:
+      - signals:/signals
+      - /dev/ttyUSB0:/dev/ttyUSB0
+      - /home/raspberrypi/v4l2-source/appBackend/ftdi_service.py:/app/ftdi_service.py
+    # command: tail -f /dev/null  # Placeholder command to keep container running; replace with actual command as needed
+    # command: python3 -m watchfiles "python3 ftdi_service.py"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CONTROL_CHANNEL=camera_control
+      - STATUS_CHANNEL=camera_status
+      - SIMULATION_MODE=False
+      - SERIAL_PORT=/dev/ttyUSB0
+    privileged: true
+    restart: unless-stopped
+    depends_on:
+      - redis
   camera:
-    image: reg.fls-engineering.de/library/cam_v4l2:2.5.0
+    image: reg.fls-engineering.de/library/cam_v4l2:2.6.0
     working_dir: /test
     volumes:
       - signals:/signals
@@ -27,7 +56,7 @@ services:
       - LIBCAMERA_RPI_CONFIG_FILE=/app/pisp_config.yaml
       - CAMERA_TEST_MODE=OFF
       - CAMERA_MAX_WIDTH_JPG=1000
-      - CAMERA_SENDJPG=FALSE
+      - CAMERA_SENDJPG=ON
       - CAMERA_SETCONTROLS_AT_RESUME=ON
     network_mode: host
     privileged: true
@@ -38,7 +67,7 @@ services:
         restart: true
 
   backend:
-    image: reg.fls-engineering.de/library/backend:1.9.2
+    image: reg.fls-engineering.de/library/backend:2.0.0
     volumes:
       - signals:/signals
       - images:/images
@@ -60,6 +89,7 @@ services:
       - ./dump:/dump
       - ./var:/version_info
       - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
+      - /home/raspberrypi/v4l2-source/appBackend/:/app/appBackend/
     cap_add:
       - SYS_BOOT
       - SYS_ADMIN
@@ -85,6 +115,7 @@ services:
       - camera_env_file=/settings/camera.env
       - parameters_login_needed=True
       - version_file=/version_info/build_info.json
+      - FTDI_INTEGRATION=true
     privileged: true
     working_dir: /app/appBackend
     command: uvicorn appBackend:appASGI --host * --port 80 --log-level info
@@ -108,13 +139,13 @@ services:
       - ./trigger_images:/ftp_root/raspberrypi/triggerImages
     restart: always
   
-  wetty:
-    image: wettyoss/wetty:latest
+  ttyd:
+    image: tsl0922/ttyd:alpine
     ports:
-     - 3000:3000
+     - 3000:7681
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    command: --ssh-host=host.docker.internal --ssh-user=raspberrypi --ssh-pass=pirmasens --bypasshelmet=true
+    command: ttyd   raspberrypi@host.docker.internal
     restart: unless-stopped
 
   siemensstern:
@@ -141,3 +172,6 @@ volumes:
       o: size=10M
   images:
   logs:
+networks:
+  ftdi-network:
+    driver: bridge
