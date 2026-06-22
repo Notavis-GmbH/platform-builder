@@ -19,15 +19,16 @@ sudo chown "$TARGET_USER":"$TARGET_USER" "$TARGET_HOME/.local/bin/start_kiosk.sh
 
 # Install system service (system-wide) but set User and HOME dynamically
 SERVICE_PATH="/etc/systemd/system/firefox-kiosk.service"
+TARGET_UID=$(id -u "$TARGET_USER")
 sudo tee "$SERVICE_PATH" > /dev/null <<EOF
 [Unit]
-Description=Firefox Kiosk Autostart
+Description=Kiosk Autostart (Cog/WPE)
 After=graphical.target network-online.target
 
 [Service]
 User=$TARGET_USER
-Environment=DISPLAY=:0
-Environment=XAUTHORITY=$TARGET_HOME/.Xauthority
+Environment=XDG_RUNTIME_DIR=/run/user/$TARGET_UID
+Environment=WAYLAND_DISPLAY=wayland-1
 ExecStart=$TARGET_HOME/.local/bin/start_kiosk.sh
 Restart=always
 

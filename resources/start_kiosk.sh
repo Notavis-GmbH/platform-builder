@@ -6,5 +6,5 @@ until curl -s http://localhost:80 > /dev/null; do
     sleep 2
 done
 
-# Launch Firefox in fullscreen kiosk mode
-firefox --kiosk http://localhost:80
+# Launch Cog (WPE WebKit kiosk browser) in fullscreen
+cog http://localhost:80
