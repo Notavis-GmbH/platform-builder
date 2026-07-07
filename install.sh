@@ -211,37 +211,11 @@ fi
 echo "Step 4: Unblocking Wi-Fi..."
 run_step "Unblock Wi-Fi and mask rfkill" "sudo rfkill unblock wifi && sudo systemctl mask rfkill.service && sudo systemctl mask rfkill.socket"
 
-# Check libcamera version before building
-echo "Step 5: Checking and installing libcamera and rpicam-apps..."
-REQUIRED_LIBCAMERA_VERSION="v0.0.0+5323-42d5b620"
-REQUIRED_RPICAM_VERSION="v1.5.2"
-
-if command -v libcamera-hello &> /dev/null; then
-    echo "Checking installed libcamera version..."
-    VERSION_OUTPUT=$(libcamera-hello --version 2>&1)
-    
-    INSTALLED_LIBCAMERA=$(echo "$VERSION_OUTPUT" | grep "libcamera build:" | awk '{print $3}')
-    INSTALLED_RPICAM=$(echo "$VERSION_OUTPUT" | grep "rpicam-apps build:" | awk '{print $3}')
-    
-    echo "Installed rpicam-apps: ${INSTALLED_RPICAM}"
-    echo "Installed libcamera: ${INSTALLED_LIBCAMERA}"
-    echo "Required rpicam-apps: ${REQUIRED_RPICAM_VERSION}"
-    echo "Required libcamera: ${REQUIRED_LIBCAMERA_VERSION}"
-    
-    if [ "${INSTALLED_LIBCAMERA}" = "${REQUIRED_LIBCAMERA_VERSION}" ] && [ "${INSTALLED_RPICAM}" = "${REQUIRED_RPICAM_VERSION}" ]; then
-        echo "Correct libcamera and rpicam-apps versions are already installed. Skipping build."
-    else
-        echo "Version mismatch detected. Building libcamera and rpicam-apps..."
-        run_step "Build libcamera and rpicam-apps" "make all"
-    fi
-else
-    echo "libcamera-hello not found. Building libcamera and rpicam-apps..."
-    run_step "Build libcamera and rpicam-apps" "make all"
-fi
+#
 
 # Check if vc-mipi-driver-bcm2712 is already installed with the correct version
 echo "Step 6: Checking and installing vc-mipi-driver..."
-REQUIRED_VERSION="0.6.7"
+REQUIRED_VERSION="0.6.10"
 PACKAGE_NAME="vc-mipi-driver-bcm2712"
 
 if dpkg -l | grep -q "^ii  ${PACKAGE_NAME}"; then
@@ -268,10 +242,10 @@ run_step "Start raspap services" "sudo docker compose -f docker-compose.raspap.y
 
 echo "Step 9: Starting app platform services..."
 run_step "Pull app platform images" "cd app_platform && sudo docker compose pull"
-run_step "Start app platform services" "cd app_platform && sudo docker compose down &&  sudo docker compose up -d --remove-orphans"
+run_step "Start app platform services" "cd app_platform && sudo docker compose up -d --remove-orphans"
 
-echo "Step 10: Install autostart kiosk..."
-run_step "Install autostart kiosk" "sudo bash installAutostartKiosk.sh"
+# echo "Step 10: Uninstalling autostart kiosk..."
+# run_step "Uninstall autostart kiosk" "sudo bash uninstallAutostartKiosk.sh"
 
 # Archive installer logs and copy to /var/log/platform-installer for diagnostics
 archive_installer_logs() {
@@ -318,8 +292,9 @@ record_build_info() {
 
     if [ "${#compose_images[@]}" -ne 0 ]; then
         images_array=()
-        if command -v sudo docker >/dev/null 2>&1; then
-            # get local images once
+        if command -v docker >/dev/null 2>&1; then
+            # get local images once (sudo: docker group membership from this session's
+            # `usermod -aG docker` won't be active until re-login)
             mapfile -t local_lines < <(sudo docker images --format '{{.Repository}}:::{{.Tag}}:::{{.ID}}' | sort -u)
         else
             local_lines=()
@@ -340,7 +315,7 @@ record_build_info() {
 
             id=""
             present=false
-            if command -v sudo docker >/dev/null 2>&1; then
+            if command -v docker >/dev/null 2>&1; then
                 # attempt to find local image by exact repo:tag match
                 id=$(sudo docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | awk -v img="$img" '$1==img {print $2; exit}') || true
                 if [ -n "$id" ]; then
@@ -375,6 +350,9 @@ EOF
 
     echo "Wrote build info to $BUILD_FILE"
 }
+
+
+run_step "Install autostart kiosk service" "bash installAutostartKiosk.sh"
 
 run_step "Record build metadata" -- record_build_info
 

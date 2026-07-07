@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Uninstall the Firefox kiosk autostart service and start script if installed.
+# Uninstall the Cog kiosk autostart service and start script if installed.
 
 set -euo pipefail
 
@@ -13,11 +13,11 @@ if [ -z "$TARGET_USER" ] || [ ! -d "$TARGET_HOME" ]; then
 	exit 1
 fi
 
-SERVICE_NAME="firefox-kiosk.service"
+SERVICE_NAME="cog-kiosk.service"
 SERVICE_PATH="/etc/systemd/system/${SERVICE_NAME}"
 START_SCRIPT="$TARGET_HOME/.local/bin/start_kiosk.sh"
 
-echo "Uninstalling Firefox kiosk autostart for user: $TARGET_USER (home: $TARGET_HOME)"
+echo "Uninstalling Cog kiosk autostart for user: $TARGET_USER (home: $TARGET_HOME)"
 
 # Stop and disable the system service if it exists
 if sudo systemctl list-unit-files | grep -q "^${SERVICE_NAME}" 2>/dev/null || [ -f "$SERVICE_PATH" ]; then

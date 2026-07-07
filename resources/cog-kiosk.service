@@ -1,0 +1,14 @@
+[Unit]
+Description=Cog Kiosk Autostart
+After=graphical.target network-online.target
+
+[Service]
+User=raspberrypi
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=COG_PLATFORM_WL_VIEW_FULLSCREEN=1
+ExecStart=/home/raspberrypi/.local/bin/start_kiosk.sh
+Restart=always
+
+[Install]
+WantedBy=graphical.target

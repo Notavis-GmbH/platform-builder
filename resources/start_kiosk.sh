@@ -6,5 +6,5 @@ until curl -s http://localhost:80 > /dev/null; do
     sleep 2
 done
 
-# Launch Cog (WPE WebKit kiosk browser) in fullscreen
+# Launch Cog in fullscreen kiosk mode
 cog http://localhost:80

@@ -18,17 +18,18 @@ sudo chmod +x "$TARGET_HOME/.local/bin/start_kiosk.sh"
 sudo chown "$TARGET_USER":"$TARGET_USER" "$TARGET_HOME/.local/bin/start_kiosk.sh"
 
 # Install system service (system-wide) but set User and HOME dynamically
-SERVICE_PATH="/etc/systemd/system/firefox-kiosk.service"
+SERVICE_PATH="/etc/systemd/system/cog-kiosk.service"
 TARGET_UID=$(id -u "$TARGET_USER")
 sudo tee "$SERVICE_PATH" > /dev/null <<EOF
 [Unit]
-Description=Kiosk Autostart (Cog/WPE)
+Description=Cog Kiosk Autostart
 After=graphical.target network-online.target
 
 [Service]
 User=$TARGET_USER
 Environment=XDG_RUNTIME_DIR=/run/user/$TARGET_UID
-Environment=WAYLAND_DISPLAY=wayland-1
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=COG_PLATFORM_WL_VIEW_FULLSCREEN=1
 ExecStart=$TARGET_HOME/.local/bin/start_kiosk.sh
 Restart=always
 
@@ -37,6 +38,6 @@ WantedBy=graphical.target
 EOF
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now firefox-kiosk.service
+sudo systemctl enable --now cog-kiosk.service
 
-echo "Autostart service installed and started. Check status with: sudo systemctl status firefox-kiosk.service"
+echo "Autostart service installed and started. Check status with: sudo systemctl status cog-kiosk.service"
