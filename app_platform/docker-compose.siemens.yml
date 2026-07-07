@@ -140,12 +140,12 @@ services:
     restart: always
   
   ttyd:
-    image: tsl0922/ttyd:alpine
+    build: ./ttyd
     ports:
      - 3000:7681
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    command: ttyd   raspberrypi@host.docker.internal
+    command: ttyd --writable -t fontSize=20 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null raspberrypi@host.docker.internal
     restart: unless-stopped
 
   siemensstern:
