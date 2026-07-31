@@ -241,7 +241,7 @@ fi
 
 # Check if vc-mipi-driver-bcm2712 is already installed with the correct version
 echo "Step 6: Checking and installing vc-mipi-driver..."
-REQUIRED_VERSION="0.6.7"
+REQUIRED_VERSION="0.6.10"
 PACKAGE_NAME="vc-mipi-driver-bcm2712"
 
 if dpkg -l | grep -q "^ii  ${PACKAGE_NAME}"; then
@@ -259,18 +259,37 @@ else
     run_step "Install vc-mipi-driver" "wget -N --timestamping https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v0.6.7/vc-mipi-driver-bcm2712_0.6.7_arm64.deb && sudo apt install ./vc-mipi-driver-bcm2712_0.6.7_arm64.deb -y"
 fi
 
+echo "Step 7: Copying vc-mipi-driver config to /boot/firmware/..."
+run_step "Copy vc-mipi-driver config" "sudo cp config_vc-mipi-driver-bcm2712.txt /boot/firmware/"
+
 # Add log limit to 10 mb for docker globally
-echo "Step 7: Configuring Docker logging..."
+echo "Step 8: Configuring Docker logging..."
 run_step "Configure Docker logging" "mkdir -p ~/.docker/ && cp resources/config.json ~/.docker/config.json"
 
-echo "Step 8: Starting raspap services..."
+echo "Step 9: Starting raspap services..."
 run_step "Start raspap services" "sudo docker compose -f docker-compose.raspap.yml up -d"
 
-echo "Step 9: Starting app platform services..."
+echo "Step 10: Starting app platform services..."
+
+# /mnt/data must be mounted to persistent storage (e.g. an SSD) before the app platform
+# starts. Mounting is a manual step (e.g. via /etc/fstab) done outside this installer —
+# if it's skipped, docker will silently create /mnt/data on the root filesystem instead.
+check_mnt_data_mounted() {
+    if ! mountpoint -q /mnt/data; then
+        echo "/mnt/data is not a mount point. Mount the SSD to /mnt/data before running this installer." >&2
+        return 1
+    fi
+}
+
+if ! run_step "Check /mnt/data is mounted" -- check_mnt_data_mounted; then
+    echo "Aborting: /mnt/data must be mounted to persistent storage first. Mount the SSD, then re-run the installer." >&2
+    exit 1
+fi
+
 run_step "Pull app platform images" "cd app_platform && sudo docker compose pull"
 run_step "Start app platform services" "cd app_platform && sudo docker compose up -d --remove-orphans"
 
-echo "Step 10: Uninstalling autostart kiosk..."
+echo "Step 11: Uninstalling autostart kiosk..."
 run_step "Uninstall autostart kiosk" "sudo bash uninstallAutostartKiosk.sh"
 
 # Archive installer logs and copy to /var/log/platform-installer for diagnostics
