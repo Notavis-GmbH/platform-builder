@@ -90,7 +90,7 @@ run_step() {
     done
 
     # wait for process and capture exit code
-    wait "$cmd_pid" 2>/dev/null || true
+    wait "$cmd_pid" 2>/dev/null
     rc=$?
 
     # compute total elapsed and clear spinner line
@@ -211,33 +211,6 @@ fi
 echo "Step 4: Unblocking Wi-Fi..."
 run_step "Unblock Wi-Fi and mask rfkill" "sudo rfkill unblock wifi && sudo systemctl mask rfkill.service && sudo systemctl mask rfkill.socket"
 
-# Check libcamera version before building
-echo "Step 5: Checking and installing libcamera and rpicam-apps..."
-REQUIRED_LIBCAMERA_VERSION="v0.0.0+5323-42d5b620"
-REQUIRED_RPICAM_VERSION="v1.5.2"
-
-if command -v libcamera-hello &> /dev/null; then
-    echo "Checking installed libcamera version..."
-    VERSION_OUTPUT=$(libcamera-hello --version 2>&1)
-    
-    INSTALLED_LIBCAMERA=$(echo "$VERSION_OUTPUT" | grep "libcamera build:" | awk '{print $3}')
-    INSTALLED_RPICAM=$(echo "$VERSION_OUTPUT" | grep "rpicam-apps build:" | awk '{print $3}')
-    
-    echo "Installed rpicam-apps: ${INSTALLED_RPICAM}"
-    echo "Installed libcamera: ${INSTALLED_LIBCAMERA}"
-    echo "Required rpicam-apps: ${REQUIRED_RPICAM_VERSION}"
-    echo "Required libcamera: ${REQUIRED_LIBCAMERA_VERSION}"
-    
-    if [ "${INSTALLED_LIBCAMERA}" = "${REQUIRED_LIBCAMERA_VERSION}" ] && [ "${INSTALLED_RPICAM}" = "${REQUIRED_RPICAM_VERSION}" ]; then
-        echo "Correct libcamera and rpicam-apps versions are already installed. Skipping build."
-    else
-        echo "Version mismatch detected. Building libcamera and rpicam-apps..."
-        run_step "Build libcamera and rpicam-apps" "make all"
-    fi
-else
-    echo "libcamera-hello not found. Building libcamera and rpicam-apps..."
-    run_step "Build libcamera and rpicam-apps" "make all"
-fi
 
 # Check if vc-mipi-driver-bcm2712 is already installed with the correct version
 echo "Step 6: Checking and installing vc-mipi-driver..."
@@ -338,8 +311,9 @@ record_build_info() {
     if [ "${#compose_images[@]}" -ne 0 ]; then
         images_array=()
         if command -v docker >/dev/null 2>&1; then
-            # get local images once
-            mapfile -t local_lines < <(docker images --format '{{.Repository}}:::{{.Tag}}:::{{.ID}}' | sort -u)
+            # get local images once (sudo: docker group membership from this session's
+            # `usermod -aG docker` won't be active until re-login)
+            mapfile -t local_lines < <(sudo docker images --format '{{.Repository}}:::{{.Tag}}:::{{.ID}}' | sort -u)
         else
             local_lines=()
         fi
@@ -361,7 +335,7 @@ record_build_info() {
             present=false
             if command -v docker >/dev/null 2>&1; then
                 # attempt to find local image by exact repo:tag match
-                id=$(docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | awk -v img="$img" '$1==img {print $2; exit}') || true
+                id=$(sudo docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | awk -v img="$img" '$1==img {print $2; exit}') || true
                 if [ -n "$id" ]; then
                     present=true
                 fi
@@ -394,6 +368,9 @@ EOF
 
     echo "Wrote build info to $BUILD_FILE"
 }
+
+
+run_step "Install autostart kiosk service" "bash installAutostartKiosk.sh"
 
 run_step "Record build metadata" -- record_build_info
 

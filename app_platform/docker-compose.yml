@@ -21,7 +21,6 @@ services:
       - CAMERA_IPCPORTCONTROL=ipc:///signals/cam.control.0
       - CAMERA_DEVICE=/dev/video0
       - CAMERA_SENDJPG=ON
-      - CAMERA_PERFORMANCE_MINUS=ON
       - CAMERA_PERFORMANCE_TESTING=OFF
       - CAMERA_FORCE_ROI=OFF
       - CAMERA_IDENTIFIER_FILE_PATH=/license/identifier.enc

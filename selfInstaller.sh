@@ -1,5 +1,5 @@
 #!/bin/bash
-branch="master"
+branch="ov9281"
 user=$(whoami)
 cd  ~
 if [ -d platform-builder ]; then 

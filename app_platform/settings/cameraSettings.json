@@ -4,7 +4,7 @@
         "name": "9963793",
         "source": 0,
         "type": 0,
-        "value": 24969
+        "value": 146
     },
     {
         "command": "set_value",
@@ -53,14 +53,14 @@
         "name": "10026994",
         "source": 0,
         "type": 0,
-        "value": 22813
+        "value": 59999
     },
     {
         "command": "set_value",
         "name": "frameRate",
         "source": 3,
         "type": 3,
-        "value": 29.5
+        "value": 60000.0
     },
     {
         "command": "set_value",
@@ -103,5 +103,19 @@
         "source": 3,
         "type": 6,
         "value": 1
+    },
+    {
+        "command": "set_value",
+        "name": "DisableForwarding",
+        "source": 3,
+        "type": 4,
+        "value": true
+    },
+    {
+        "command": "set_value",
+        "name": "SaveImages",
+        "source": 3,
+        "type": 4,
+        "value": true
     }
 ]
