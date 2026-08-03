@@ -10,7 +10,7 @@ if [ -d platform-builder ]; then
     scp -r  platform-builder/app_platform/license /opt/platform-builder/ 
   fi
     sudo chown -R "$(whoami):$(whoami)" ~/platform-builder # ensure user owns the dir
-    cd platform-builder && git reset --hard HEAD && git clean -fd && git switch $branch &&  git pull && bash install.sh
+    cd platform-builder && git fetch origin && git reset --hard HEAD && git clean -fd && git checkout -B $branch origin/$branch && git pull && bash install.sh
 else 
   git clone https://github.com/Notavis-GmbH/platform-builder && cd platform-builder && bash install.sh
 fi
