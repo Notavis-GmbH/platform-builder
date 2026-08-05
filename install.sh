@@ -183,10 +183,10 @@ table ip nat {
         oifname "end0" masquerade
 
         # Docker-Subnetze Masqueraden
-        ip saddr 172.17.0.0/16 oifname != "docker0" masq
-        ip saddr 172.18.0.0/16 oifname != "docker0" masq
-        ip saddr 172.19.0.0/16 oifname != "docker0" masq
-        ip saddr 192.168.0.0/16 oifname != "docker0" masq
+        ip saddr 172.17.0.0/16 oifname != "docker0" masquerade
+        ip saddr 172.18.0.0/16 oifname != "docker0" masquerade
+        ip saddr 172.19.0.0/16 oifname != "docker0" masquerade
+        ip saddr 192.168.0.0/16 oifname != "docker0" masquerade
     }
 }
 EOF
