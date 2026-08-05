@@ -11,6 +11,8 @@ echo "Starting platform installation..."
 LOGDIR="$HOME/.platform_installer_logs"
 mkdir -p "$LOGDIR"
 
+echo "Git branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown), commit: $(git rev-parse --short HEAD 2>/dev/null || echo unknown)" | tee "$LOGDIR/git_info.log"
+
 # step counter
 STEP_NO=0
 
