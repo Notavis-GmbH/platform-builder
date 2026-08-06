@@ -227,11 +227,11 @@ if dpkg -l | grep -q "^ii  ${PACKAGE_NAME}"; then
         echo "${PACKAGE_NAME} version ${REQUIRED_VERSION} is already installed. Skipping installation."
     else
         echo "Installed version (${INSTALLED_VERSION}) does not match required version (${REQUIRED_VERSION}). Updating..."
-        run_step "Install vc-mipi-driver (update)" "wget -N --timestamping https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v0.6.7/vc-mipi-driver-bcm2712_0.6.7_arm64.deb && sudo apt install ./vc-mipi-driver-bcm2712_0.6.7_arm64.deb -y"
+        run_step "Install vc-mipi-driver (update)" "wget -N --timestamping https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v${REQUIRED_VERSION}/vc-mipi-driver-bcm2712_${REQUIRED_VERSION}_arm64.deb && sudo apt install ./vc-mipi-driver-bcm2712_${REQUIRED_VERSION}_arm64.deb -y --allow-downgrades"
     fi
 else
     echo "${PACKAGE_NAME} is not installed. Installing version ${REQUIRED_VERSION}..."
-    run_step "Install vc-mipi-driver" "wget -N --timestamping https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v0.6.7/vc-mipi-driver-bcm2712_0.6.7_arm64.deb && sudo apt install ./vc-mipi-driver-bcm2712_0.6.7_arm64.deb -y"
+    run_step "Install vc-mipi-driver" "wget -N --timestamping https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v${REQUIRED_VERSION}/vc-mipi-driver-bcm2712_${REQUIRED_VERSION}_arm64.deb && sudo apt install ./vc-mipi-driver-bcm2712_${REQUIRED_VERSION}_arm64.deb -y"
 fi
 
 echo "Step 7: Copying vc-mipi-driver config to /boot/firmware/..."
@@ -246,9 +246,94 @@ run_step "Start raspap services" "sudo docker compose -f docker-compose.raspap.y
 
 echo "Step 10: Starting app platform services..."
 
-# /mnt/data must be mounted to persistent storage (e.g. an SSD) before the app platform
-# starts. Mounting is a manual step (e.g. via /etc/fstab) done outside this installer —
-# if it's skipped, docker will silently create /mnt/data on the root filesystem instead.
+# /mnt/data must be mounted to persistent storage (e.g. an SSD/NVMe) before the app
+# platform starts, otherwise docker will silently create /mnt/data on the root
+# filesystem instead. This step is optional/best-effort: it only acts when it finds
+# exactly one unmounted NVMe partition and /mnt/data isn't already mounted or in
+# /etc/fstab; otherwise it does nothing and leaves the manual-mount requirement below
+# in place.
+setup_nvme_data_mount() {
+    local mnt="/mnt/data"
+
+    if mountpoint -q "$mnt"; then
+        echo "${mnt} is already mounted; nothing to do."
+        return 0
+    fi
+
+    if grep -qE "^[^#][^[:space:]]*[[:space:]]+${mnt}[[:space:]]" /etc/fstab; then
+        echo "${mnt} already has an /etc/fstab entry; attempting to mount it..."
+        sudo mkdir -p "$mnt"
+        sudo mount "$mnt"
+        return $?
+    fi
+
+    # Candidates: NVMe partitions that have a filesystem and aren't mounted anywhere.
+    local candidates=()
+    while read -r dev fstype mountpt; do
+        [ -n "$fstype" ] || continue
+        [ -z "$mountpt" ] || continue
+        candidates+=("$dev")
+    done < <(lsblk -rno PATH,FSTYPE,MOUNTPOINT | grep -E '^/dev/nvme[0-9]+n[0-9]+p[0-9]+ ')
+
+    if [ "${#candidates[@]}" -eq 0 ]; then
+        echo "No unmounted NVMe partition found; skipping NVMe auto-mount."
+        return 0
+    fi
+    if [ "${#candidates[@]}" -gt 1 ]; then
+        echo "Multiple unmounted NVMe partitions found (${candidates[*]}); skipping NVMe auto-mount (ambiguous, pick one manually)." >&2
+        return 0
+    fi
+
+    local part="${candidates[0]}" uuid fstype
+    uuid=$(sudo blkid -s UUID -o value "$part")
+    fstype=$(sudo blkid -s TYPE -o value "$part")
+
+    if [ -z "$uuid" ] || [ -z "$fstype" ]; then
+        echo "Could not determine UUID/filesystem for ${part}; skipping NVMe auto-mount." >&2
+        return 0
+    fi
+
+    echo "Found unmounted NVMe partition ${part} (${fstype}, UUID=${uuid}); mounting at ${mnt}."
+
+    if [ -d "$mnt" ] && [ -n "$(ls -A "$mnt" 2>/dev/null)" ]; then
+        echo "Note: ${mnt} already has content on the root filesystem. It will be hidden" \
+             "(not deleted) once the NVMe is mounted over it."
+    fi
+
+    sudo mkdir -p "$mnt"
+
+    local ts
+    ts=$(date +%Y%m%d-%H%M%S)
+    sudo cp /etc/fstab "/etc/fstab.${ts}.bak"
+    echo "UUID=${uuid}  ${mnt}  ${fstype}  defaults,nofail  0  2" | sudo tee -a /etc/fstab >/dev/null
+
+    sudo mount "$mnt"
+}
+
+run_step "Mount NVMe to /mnt/data (optional)" -- setup_nvme_data_mount
+
+# If /mnt/data ended up mounted (whether just now or already), make sure the
+# installing user owns it so app_platform can write to it without sudo.
+ensure_mnt_data_ownership() {
+    local mnt="/mnt/data"
+    if ! mountpoint -q "$mnt"; then
+        echo "${mnt} is not mounted; skipping ownership check."
+        return 0
+    fi
+
+    local owner
+    owner=$(stat -c '%U:%G' "$mnt")
+    if [ "$owner" = "$(id -un):$(id -gn)" ]; then
+        echo "${mnt} is already owned by $(id -un):$(id -gn)."
+    else
+        echo "${mnt} is owned by ${owner}; changing to $(id -un):$(id -gn)."
+        sudo chown "$(id -u):$(id -g)" "$mnt"
+    fi
+    sudo chmod 755 "$mnt"
+}
+
+run_step "Ensure /mnt/data ownership" -- ensure_mnt_data_ownership
+
 check_mnt_data_mounted() {
     if ! mountpoint -q /mnt/data; then
         echo "/mnt/data is not a mount point. Mount the SSD to /mnt/data before running this installer." >&2
