@@ -22,6 +22,8 @@ services:
       - CAMERA_DEVICE=/dev/video0
       - CAMERA_SENDJPG=ON
       - CAMERA_PERFORMANCE_TESTING=OFF
+      - CAMERA_PERFORMANCE_MINUS=ON
+
       - CAMERA_FORCE_ROI=OFF
       - CAMERA_IDENTIFIER_FILE_PATH=/license/identifier.enc
       - CAMERA_LICENSE_FILE_PATH=/license/license.lic
@@ -37,10 +39,13 @@ services:
       - CAMERA_SETCONTROLS_AT_RESUME=ON
       - CAMERA_MAX_FRAMERATE=100000
       - CAMERA_SAVE_FOLDER=/history_images
+      - CAMERA_SAVE_RAW=OFF
     network_mode: host
     privileged: true
     restart: unless-stopped
-    depends_on: 
+    cpuset: "2,3"
+    cpu_shares: 2048
+    depends_on:
       backend:
         condition: service_healthy
         restart: true
@@ -98,6 +103,7 @@ services:
     command: uvicorn appBackend:appASGI --host * --port 80 --log-level info
     restart: unless-stopped
     network_mode: host
+    cpuset: "0,1"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/frontend/current_time"]
       interval: 5s

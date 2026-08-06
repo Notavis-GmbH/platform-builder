@@ -237,6 +237,9 @@ fi
 echo "Step 7: Copying vc-mipi-driver config to /boot/firmware/..."
 run_step "Copy vc-mipi-driver config" "sudo cp config_vc-mipi-driver-bcm2712.txt /boot/firmware/"
 
+echo "Step 7b: Installing camera IRQ affinity service..."
+run_step "Install camera IRQ affinity" "bash installCameraIrqAffinity.sh"
+
 # Add log limit to 10 mb for docker globally
 echo "Step 8: Configuring Docker logging..."
 run_step "Configure Docker logging" "mkdir -p ~/.docker/ && cp resources/config.json ~/.docker/config.json"
@@ -245,6 +248,45 @@ echo "Step 9: Starting raspap services..."
 run_step "Start raspap services" "sudo docker compose -f docker-compose.raspap.yml up -d"
 
 echo "Step 10: Starting app platform services..."
+
+# Some RPi5 NVMe HATs let the SSD controller drop into an unrecoverable low-power
+# state (D3cold) under PCIe ASPM/APST power management, which surfaces as
+# "controller is down" resets and the filesystem being shut down mid-write.
+# Disabling these power-saving features on the kernel command line prevents that.
+# Requires a reboot to take effect.
+configure_nvme_power_management() {
+    local cmdline="/boot/firmware/cmdline.txt"
+    local params="nvme_core.default_ps_max_latency_us=0 pcie_aspm=off pcie_port_pm=off"
+
+    if [ ! -f "$cmdline" ]; then
+        echo "${cmdline} not found; skipping NVMe power management config." >&2
+        return 0
+    fi
+
+    local missing=()
+    local p
+    for p in $params; do
+        grep -qw -- "$p" "$cmdline" || missing+=("$p")
+    done
+
+    if [ "${#missing[@]}" -eq 0 ]; then
+        echo "NVMe power management parameters already present in ${cmdline}."
+        return 0
+    fi
+
+    local ts
+    ts=$(date +%Y%m%d-%H%M%S)
+    sudo cp "$cmdline" "${cmdline}.${ts}.bak"
+
+    local current
+    current=$(cat "$cmdline")
+    echo "${current} ${missing[*]}" | sudo tee "$cmdline" >/dev/null
+
+    echo "Added NVMe power management parameters to ${cmdline}: ${missing[*]}"
+    echo "A reboot is required for this change to take effect."
+}
+
+run_step "Configure NVMe power management" -- configure_nvme_power_management
 
 # /mnt/data must be mounted to persistent storage (e.g. an SSD/NVMe) before the app
 # platform starts, otherwise docker will silently create /mnt/data on the root
@@ -267,13 +309,35 @@ setup_nvme_data_mount() {
         return $?
     fi
 
-    # Candidates: NVMe partitions that have a filesystem and aren't mounted anywhere.
+    # Candidates: NVMe partitions that aren't mounted anywhere, split into ones that
+    # already have a filesystem and ones that are blank (no fstype, e.g. a fresh or
+    # freshly-wiped SSD).
     local candidates=()
+    local blank_candidates=()
     while read -r dev fstype mountpt; do
-        [ -n "$fstype" ] || continue
         [ -z "$mountpt" ] || continue
-        candidates+=("$dev")
+        if [ -n "$fstype" ]; then
+            candidates+=("$dev")
+        else
+            blank_candidates+=("$dev")
+        fi
     done < <(lsblk -rno PATH,FSTYPE,MOUNTPOINT | grep -E '^/dev/nvme[0-9]+n[0-9]+p[0-9]+ ')
+
+    # If there's no already-formatted candidate but exactly one blank NVMe partition,
+    # format it as ext4 so a fresh/wiped SSD can be provisioned without manual steps.
+    if [ "${#candidates[@]}" -eq 0 ] && [ "${#blank_candidates[@]}" -eq 1 ]; then
+        local blank_part="${blank_candidates[0]}"
+        echo "Found unformatted NVMe partition ${blank_part}; formatting as ext4."
+        if sudo mkfs.ext4 -F -L data "$blank_part"; then
+            candidates=("$blank_part")
+        else
+            echo "Failed to format ${blank_part}; skipping NVMe auto-mount." >&2
+            return 1
+        fi
+    elif [ "${#candidates[@]}" -eq 0 ] && [ "${#blank_candidates[@]}" -gt 1 ]; then
+        echo "Multiple unformatted NVMe partitions found (${blank_candidates[*]}); skipping NVMe auto-mount (ambiguous, pick one manually)." >&2
+        return 0
+    fi
 
     if [ "${#candidates[@]}" -eq 0 ]; then
         echo "No unmounted NVMe partition found; skipping NVMe auto-mount."
