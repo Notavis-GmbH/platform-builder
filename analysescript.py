@@ -37,14 +37,13 @@ pat = re.compile(r"^frame_(\d+)_(\d{6})\.(?:jpg|jpeg|png|bmp)$", re.I)
 
 ts = []
 skipped = 0
-for e in os.scandir(folder):
-    if not e.is_file():
-        continue
-    m = pat.match(e.name)
-    if m:
-        ts.append(int(m.group(1)) + int(m.group(2)) / 1_000_000)
-    else:
-        skipped += 1
+for root, _dirs, files in os.walk(folder):
+    for name in files:
+        m = pat.match(name)
+        if m:
+            ts.append(int(m.group(1)) + int(m.group(2)) / 1_000_000)
+        else:
+            skipped += 1
 
 if len(ts) < 2:
     print(f"ERROR: need >=2 frame files in {folder} (found {len(ts)})")
