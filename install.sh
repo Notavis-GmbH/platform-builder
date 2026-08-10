@@ -214,6 +214,51 @@ echo "Step 4: Unblocking Wi-Fi..."
 run_step "Unblock Wi-Fi and mask rfkill" "sudo rfkill unblock wifi && sudo systemctl mask rfkill.service && sudo systemctl mask rfkill.socket"
 
 
+# Vision Components' vc_mipi_* kernel modules sometimes ship built into the
+# kernel image itself (under kernel/drivers/media/i2c/) at a newer version
+# than this pinned DKMS package. DKMS then refuses "dkms install" because the
+# module it's about to install isn't newer than what's already in the kernel
+# tree ("is not newer than what is already found in kernel ..."). We
+# temporarily patch dkms's shared postinst helper to force that one install,
+# then restore the original helper so other DKMS packages keep the default
+# safety check.
+install_vc_mipi_driver() {
+    local version="$1"
+    shift
+    local deb="vc-mipi-driver-bcm2712_${version}_arm64.deb"
+    local dkms_postinst="/usr/lib/dkms/common.postinst"
+    local backup="${dkms_postinst}.pre-vc-mipi-force.bak"
+
+    wget -N --timestamping "https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v${version}/${deb}" || return 1
+
+    sudo cp "$dkms_postinst" "$backup"
+    sudo sed -i 's/dkms install -m "$NAME" -v "$VERSION" -k "$KERNEL" ${ARCH:+-a "$ARCH"}$/&  --force/' "$dkms_postinst"
+
+    local rc=0
+    sudo apt install "./${deb}" -y "$@" || rc=$?
+
+    sudo cp "$backup" "$dkms_postinst"
+    sudo rm -f "$backup"
+
+    return $rc
+}
+
+reconfigure_vc_mipi_driver_forced() {
+    local dkms_postinst="/usr/lib/dkms/common.postinst"
+    local backup="${dkms_postinst}.pre-vc-mipi-force.bak"
+
+    sudo cp "$dkms_postinst" "$backup"
+    sudo sed -i 's/dkms install -m "$NAME" -v "$VERSION" -k "$KERNEL" ${ARCH:+-a "$ARCH"}$/&  --force/' "$dkms_postinst"
+
+    local rc=0
+    sudo dpkg --configure -a || rc=$?
+
+    sudo cp "$backup" "$dkms_postinst"
+    sudo rm -f "$backup"
+
+    return $rc
+}
+
 # Check if vc-mipi-driver-bcm2712 is already installed with the correct version
 echo "Step 6: Checking and installing vc-mipi-driver..."
 REQUIRED_VERSION="0.6.10"
@@ -222,20 +267,31 @@ PACKAGE_NAME="vc-mipi-driver-bcm2712"
 if dpkg -l | grep -q "^ii  ${PACKAGE_NAME}"; then
     INSTALLED_VERSION=$(dpkg -l | grep "^ii  ${PACKAGE_NAME}" | awk '{print $3}')
     echo "Found ${PACKAGE_NAME} version ${INSTALLED_VERSION}"
-    
+
     if [ "${INSTALLED_VERSION}" = "${REQUIRED_VERSION}" ]; then
         echo "${PACKAGE_NAME} version ${REQUIRED_VERSION} is already installed. Skipping installation."
     else
         echo "Installed version (${INSTALLED_VERSION}) does not match required version (${REQUIRED_VERSION}). Updating..."
-        run_step "Install vc-mipi-driver (update)" "wget -N --timestamping https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v${REQUIRED_VERSION}/vc-mipi-driver-bcm2712_${REQUIRED_VERSION}_arm64.deb && sudo apt install ./vc-mipi-driver-bcm2712_${REQUIRED_VERSION}_arm64.deb -y --allow-downgrades"
+        run_step "Install vc-mipi-driver (update)" -- install_vc_mipi_driver "${REQUIRED_VERSION}" --allow-downgrades
     fi
 else
     echo "${PACKAGE_NAME} is not installed. Installing version ${REQUIRED_VERSION}..."
-    run_step "Install vc-mipi-driver" "wget -N --timestamping https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v${REQUIRED_VERSION}/vc-mipi-driver-bcm2712_${REQUIRED_VERSION}_arm64.deb && sudo apt install ./vc-mipi-driver-bcm2712_${REQUIRED_VERSION}_arm64.deb -y"
+    run_step "Install vc-mipi-driver" -- install_vc_mipi_driver "${REQUIRED_VERSION}"
+fi
+
+# dpkg may have left the package half-configured from a previous failed run
+# (e.g. this exact "not newer than kernel" DKMS error). Retry configuration
+# with the same forced-install patch so the installer is idempotent.
+if dpkg -l | grep -q "^iF  ${PACKAGE_NAME}"; then
+    echo "${PACKAGE_NAME} is half-configured from a previous failed install. Retrying..."
+    run_step "Reconfigure vc-mipi-driver (forced)" -- reconfigure_vc_mipi_driver_forced
 fi
 
 echo "Step 7: Copying vc-mipi-driver config to /boot/firmware/..."
 run_step "Copy vc-mipi-driver config" "sudo cp config_vc-mipi-driver-bcm2712.txt /boot/firmware/"
+
+echo "Step 7a: Copying vc-mipi camera overlays to /boot/firmware/overlays/..."
+run_step "Copy vc-mipi camera overlays" "sudo cp vc-mipi-bcm2712-cam0.dtbo vc-mipi-bcm2712-cam1.dtbo /boot/firmware/overlays/"
 
 echo "Step 7b: Installing camera IRQ affinity service..."
 run_step "Install camera IRQ affinity" "bash installCameraIrqAffinity.sh"
