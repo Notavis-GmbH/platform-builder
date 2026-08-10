@@ -379,11 +379,25 @@ setup_nvme_data_mount() {
         fi
     done < <(lsblk -rno PATH,FSTYPE,MOUNTPOINT | grep -E '^/dev/nvme[0-9]+n[0-9]+p[0-9]+ ')
 
-    # If there's no already-formatted candidate but exactly one blank NVMe partition,
-    # format it as ext4 so a fresh/wiped SSD can be provisioned without manual steps.
+    # A whole NVMe disk may have no partition table at all (e.g. nvme0n1 with no
+    # nvme0n1p1 child) — either blank (fresh/wiped SSD) or formatted directly without
+    # partitioning. Treat such unpartitioned, unmounted whole disks as candidates too.
+    while read -r dev fstype mountpt; do
+        [ -z "$mountpt" ] || continue
+        lsblk -rno PATH "$dev" | grep -q "^${dev}p[0-9]" && continue
+        if [ -n "$fstype" ]; then
+            candidates+=("$dev")
+        else
+            blank_candidates+=("$dev")
+        fi
+    done < <(lsblk -rno PATH,FSTYPE,MOUNTPOINT | grep -E '^/dev/nvme[0-9]+n[0-9]+ ')
+
+    # If there's no already-formatted candidate but exactly one blank NVMe partition
+    # or whole disk, format it as ext4 so a fresh/wiped SSD can be provisioned without
+    # manual steps.
     if [ "${#candidates[@]}" -eq 0 ] && [ "${#blank_candidates[@]}" -eq 1 ]; then
         local blank_part="${blank_candidates[0]}"
-        echo "Found unformatted NVMe partition ${blank_part}; formatting as ext4."
+        echo "Found unformatted NVMe device ${blank_part}; formatting as ext4."
         if sudo mkfs.ext4 -F -L data "$blank_part"; then
             candidates=("$blank_part")
         else
@@ -391,7 +405,7 @@ setup_nvme_data_mount() {
             return 1
         fi
     elif [ "${#candidates[@]}" -eq 0 ] && [ "${#blank_candidates[@]}" -gt 1 ]; then
-        echo "ERROR: Multiple unformatted NVMe partitions found (${blank_candidates[*]}); ambiguous, pick one manually and re-run." >&2
+        echo "ERROR: Multiple unformatted NVMe devices found (${blank_candidates[*]}); ambiguous, pick one manually and re-run." >&2
         return 1
     fi
 
