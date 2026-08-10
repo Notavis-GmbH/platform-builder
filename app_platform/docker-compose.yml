@@ -50,7 +50,7 @@ services:
         restart: true
 
   backend:
-    image: reg.fls-engineering.de/library/backend:2.3.0
+    image: reg.fls-engineering.de/library/backend:2.4.0
     volumes:
       - signals:/signals
       - images:/images
