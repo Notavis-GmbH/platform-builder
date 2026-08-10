@@ -346,10 +346,10 @@ run_step "Configure NVMe power management" -- configure_nvme_power_management
 
 # /mnt/data must be mounted to persistent storage (e.g. an SSD/NVMe) before the app
 # platform starts, otherwise docker will silently create /mnt/data on the root
-# filesystem instead. This step is optional/best-effort: it only acts when it finds
-# exactly one unmounted NVMe partition and /mnt/data isn't already mounted or in
-# /etc/fstab; otherwise it does nothing and leaves the manual-mount requirement below
-# in place.
+# filesystem instead. This step is mandatory: it requires exactly one unmounted NVMe
+# partition to act on (unless /mnt/data is already mounted or already in /etc/fstab);
+# any ambiguous or missing-hardware case fails the installation rather than silently
+# continuing on the root filesystem.
 setup_nvme_data_mount() {
     local mnt="/mnt/data"
 
@@ -387,21 +387,21 @@ setup_nvme_data_mount() {
         if sudo mkfs.ext4 -F -L data "$blank_part"; then
             candidates=("$blank_part")
         else
-            echo "Failed to format ${blank_part}; skipping NVMe auto-mount." >&2
+            echo "ERROR: Failed to format ${blank_part}." >&2
             return 1
         fi
     elif [ "${#candidates[@]}" -eq 0 ] && [ "${#blank_candidates[@]}" -gt 1 ]; then
-        echo "Multiple unformatted NVMe partitions found (${blank_candidates[*]}); skipping NVMe auto-mount (ambiguous, pick one manually)." >&2
-        return 0
+        echo "ERROR: Multiple unformatted NVMe partitions found (${blank_candidates[*]}); ambiguous, pick one manually and re-run." >&2
+        return 1
     fi
 
     if [ "${#candidates[@]}" -eq 0 ]; then
-        echo "No unmounted NVMe partition found; skipping NVMe auto-mount."
-        return 0
+        echo "ERROR: No unmounted NVMe partition found. NVMe storage is required for ${mnt}." >&2
+        return 1
     fi
     if [ "${#candidates[@]}" -gt 1 ]; then
-        echo "Multiple unmounted NVMe partitions found (${candidates[*]}); skipping NVMe auto-mount (ambiguous, pick one manually)." >&2
-        return 0
+        echo "ERROR: Multiple unmounted NVMe partitions found (${candidates[*]}); ambiguous, pick one manually and re-run." >&2
+        return 1
     fi
 
     local part="${candidates[0]}" uuid fstype
@@ -409,8 +409,8 @@ setup_nvme_data_mount() {
     fstype=$(sudo blkid -s TYPE -o value "$part")
 
     if [ -z "$uuid" ] || [ -z "$fstype" ]; then
-        echo "Could not determine UUID/filesystem for ${part}; skipping NVMe auto-mount." >&2
-        return 0
+        echo "ERROR: Could not determine UUID/filesystem for ${part}." >&2
+        return 1
     fi
 
     echo "Found unmounted NVMe partition ${part} (${fstype}, UUID=${uuid}); mounting at ${mnt}."
@@ -430,7 +430,7 @@ setup_nvme_data_mount() {
     sudo mount "$mnt"
 }
 
-run_step "Mount NVMe to /mnt/data (optional)" -- setup_nvme_data_mount
+run_step "Mount NVMe to /mnt/data" -- setup_nvme_data_mount || exit 1
 
 # If /mnt/data ended up mounted (whether just now or already), make sure the
 # installing user owns it so app_platform can write to it without sudo.
