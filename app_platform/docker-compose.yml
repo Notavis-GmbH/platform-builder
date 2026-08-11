@@ -37,7 +37,7 @@ services:
       - CAMERA_SETCONTROLS_AT_RESUME=ON
       - CAMERA_MAX_FRAMERATE=100000
       - CAMERA_SAVE_FOLDER=/history_images
-      - CAMERA_SAVE_RAW=OFF
+      - CAMERA_SAVE_RAW=ON
       - CAMERA_SAVE_QUEUE_MAX_ENTRIES=20
     network_mode: host
     privileged: true
