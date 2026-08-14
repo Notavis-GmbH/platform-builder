@@ -296,6 +296,25 @@ run_step "Copy vc-mipi camera overlays" "sudo cp vc-mipi-bcm2712-cam0.dtbo vc-mi
 echo "Step 7b: Installing camera IRQ affinity service..."
 run_step "Install camera IRQ affinity" "bash installCameraIrqAffinity.sh"
 
+# Root cause found 2026-08-12 on UniversitySidney2 with drop-hunt sampler: default
+# writeback thresholds let 400-800 MB of dirty pages accumulate before flushing,
+# causing 1.8-2.7 s I/O stalls that drop frames during continuous BMP capture at
+# 60 fps. Lowering the thresholds flushes dirty pages sooner and in smaller bursts.
+install_writeback_sysctl() {
+    local src="resources/99-notavis-writeback.conf"
+    local dst="/etc/sysctl.d/99-notavis-writeback.conf"
+
+    if [ ! -f "$src" ]; then
+        echo "${src} not found; skipping writeback sysctl config." >&2
+        return 1
+    fi
+
+    sudo cp "$src" "$dst" && sudo sysctl --system
+}
+
+echo "Step 7c: Configuring writeback tuning to prevent capture drops..."
+run_step "Configure writeback sysctl tuning" -- install_writeback_sysctl
+
 # Add log limit to 10 mb for docker globally
 echo "Step 8: Configuring Docker logging..."
 run_step "Configure Docker logging" "mkdir -p ~/.docker/ && cp resources/config.json ~/.docker/config.json"

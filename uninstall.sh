@@ -95,6 +95,16 @@ remove_vc_mipi_boot_config() {
     fi
 }
 
+remove_writeback_sysctl() {
+    local f="/etc/sysctl.d/99-notavis-writeback.conf"
+    if [ -f "$f" ]; then
+        sudo rm -f "$f"
+        sudo sysctl --system >/dev/null
+    else
+        echo "$f not present; skipping."
+    fi
+}
+
 remove_build_info() {
     local f="app_platform/var/build_info.json"
     if [ -f "$f" ]; then
@@ -120,6 +130,7 @@ run_step "Stop raspap services" stop_raspap
 run_step "Remove Firefox kiosk autostart" remove_kiosk_autostart
 run_step "Remove vc-mipi-driver package" remove_vc_mipi_driver
 run_step "Remove vc-mipi-driver boot config" remove_vc_mipi_boot_config
+run_step "Remove writeback sysctl tuning" remove_writeback_sysctl
 run_step "Remove build metadata" remove_build_info
 run_step "Remove installer logs" remove_installer_logs
 
