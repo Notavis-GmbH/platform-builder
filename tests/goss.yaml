@@ -1,0 +1,213 @@
+package:
+  netplan.io:
+    installed: true
+  gh:
+    installed: true
+  p7zip-full:
+    installed: true
+  vc-mipi-driver-bcm2712:
+    installed: true
+    versions:
+    - "0.6.10"
+
+service:
+  docker:
+    enabled: true
+    running: true
+  avahi-daemon:
+    enabled: true
+    running: true
+  nftables:
+    enabled: true
+    running: true
+  camera-irq-affinity:
+    enabled: true
+    running: true
+  firefox-kiosk:
+    enabled: true
+    running: true
+
+group:
+  docker:
+    exists: true
+
+command:
+  # --- Step 1: Docker ---
+  docker-version:
+    exec: "docker --version"
+    exit-status: 0
+
+  installing-user-in-docker-group:
+    exec: "groups \"$(logname 2>/dev/null || echo \"$SUDO_USER\")\" | grep -qw docker"
+    exit-status: 0
+
+  # --- Step 3: WLAN country ---
+  wlan-country-de:
+    exec: "iw reg get"
+    exit-status: 0
+    stdout:
+    - "country DE"
+
+  # --- Step 4: Wi-Fi unblocked / rfkill masked ---
+  wifi-not-soft-blocked:
+    exec: "rfkill list wifi"
+    exit-status: 0
+    stdout:
+    - "Soft blocked: no"
+
+  rfkill-service-masked:
+    exec: "systemctl is-enabled rfkill.service"
+    exit-status: 1
+    stdout:
+    - "masked"
+
+  rfkill-socket-masked:
+    exec: "systemctl is-enabled rfkill.socket"
+    exit-status: 1
+    stdout:
+    - "masked"
+
+  # --- Step 7c: writeback / IO optimization (the important one) ---
+  # Confirms the sysctl.d file didn't just get copied but was actually
+  # applied to the live kernel (`sysctl --system` ran successfully).
+  writeback-sysctl-applied:
+    exec: "sysctl vm.dirty_background_bytes vm.dirty_bytes vm.dirty_writeback_centisecs vm.dirty_expire_centisecs"
+    exit-status: 0
+    stdout:
+    - "vm.dirty_background_bytes = 33554432"
+    - "vm.dirty_bytes = 67108864"
+    - "vm.dirty_writeback_centisecs = 100"
+    - "vm.dirty_expire_centisecs = 1000"
+
+  # --- Step 9/10: raspap + app_platform docker compose stacks ---
+  raspap-services-running:
+    exec: "docker compose -f docker-compose.raspap.yml ps --status running --services"
+    exit-status: 0
+    stdout:
+    - "raspap"
+
+  app-platform-services-running:
+    exec: "cd app_platform && docker compose ps --status running --services"
+    exit-status: 0
+    stdout:
+    - "redis"
+    - "camera"
+    - "backend"
+    - "ftpServer"
+    - "ttyd"
+
+  backend-healthcheck-endpoint:
+    exec: "curl -fs http://localhost/api/frontend/current_time"
+    exit-status: 0
+
+  # --- /mnt/data must be real persistent storage, not the SD card ---
+  mnt-data-not-on-rootfs:
+    exec: "test \"$(findmnt -no SOURCE /mnt/data)\" != \"$(findmnt -no SOURCE /)\""
+    exit-status: 0
+
+  mnt-data-not-owned-by-root:
+    exec: "test \"$(stat -c '%U' /mnt/data)\" != \"root\""
+    exit-status: 0
+
+file:
+  # --- Step 2: network ---
+  /etc/netplan/raspap-bridge-br0.netplan.yaml:
+    exists: true
+    mode: "0600"
+
+  # --- Step 2: nftables/raspap ---
+  /etc/nftables.conf:
+    exists: true
+    contents:
+    - "masquerade"
+
+  # --- Step 2: avahi ---
+  /etc/avahi/avahi-daemon.conf:
+    exists: true
+    contents:
+    - "allow-interfaces=end0"
+
+  # --- Step 7: vc-mipi-driver ---
+  /boot/firmware/config_vc-mipi-driver-bcm2712.txt:
+    exists: true
+
+  # --- Step 7a: camera overlays ---
+  /boot/firmware/overlays/vc-mipi-bcm2712-cam0.dtbo:
+    exists: true
+  /boot/firmware/overlays/vc-mipi-bcm2712-cam1.dtbo:
+    exists: true
+
+  # --- Step 7b: camera IRQ affinity ---
+  /usr/local/sbin/set-camera-irq-affinity.sh:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /etc/systemd/system/camera-irq-affinity.service:
+    exists: true
+
+  # --- Step 7c: writeback / IO optimization ---
+  /etc/sysctl.d/99-notavis-writeback.conf:
+    exists: true
+    filetype: file
+    contents:
+    - "vm.dirty_background_bytes = 33554432"
+    - "vm.dirty_bytes = 67108864"
+    - "vm.dirty_writeback_centisecs = 100"
+    - "vm.dirty_expire_centisecs = 1000"
+
+  # --- Step 10: NVMe power management (requires reboot to take effect) ---
+  /boot/firmware/cmdline.txt:
+    exists: true
+    contents:
+    - "nvme_core.default_ps_max_latency_us=0"
+    - "pcie_aspm=off"
+    - "pcie_port_pm=off"
+
+  # --- Step 10: /etc/fstab entry for /mnt/data ---
+  /etc/fstab:
+    exists: true
+    contents:
+    - "/mnt/data"
+
+  # --- Kiosk autostart ---
+  /etc/systemd/system/firefox-kiosk.service:
+    exists: true
+
+  # --- Build metadata ---
+  app_platform/var/build_info.json:
+    exists: true
+    contents:
+    - "\"git\""
+    - "\"docker_images\""
+
+mount:
+  /mnt/data:
+    exists: true
+    opts:
+    - rw
+
+kernel-param:
+  # Direct read from the live kernel (/proc/sys/vm/...) — the real proof
+  # the IO/writeback tuning is in effect right now, independent of what
+  # the sysctl.d file on disk says.
+  vm.dirty_background_bytes:
+    value: "33554432"
+  vm.dirty_bytes:
+    value: "67108864"
+  vm.dirty_writeback_centisecs:
+    value: "100"
+  vm.dirty_expire_centisecs:
+    value: "1000"
+
+port:
+  tcp:80:
+    listening: true
+  tcp:6379:
+    listening: true
+  tcp:3000:
+    listening: true
+
+# Note: br0 (netplan/raspap-bridge-br0.netplan.yaml) is declared `optional`
+# with no member interfaces and isn't instantiated by networkd unless
+# something is actually bridged to it — on this host the AP runs directly
+# on wlan0, so br0 never comes up. Not asserted here for that reason.
