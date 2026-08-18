@@ -50,7 +50,7 @@ services:
         restart: true
 
   backend:
-    image: reg.fls-engineering.de/library/backend:2.4.0
+    image: reg.fls-engineering.de/library/backend:2.5.0
     volumes:
       - signals:/signals
       - images:/images
@@ -61,6 +61,7 @@ services:
       - ./settings/settings.json:/app/appBackend/settings.json
       - ./settings/filterControls.json:/app/filterControls.json
       - ./settings/runtimeSettings.json:/app/appBackend/runtimeSettings.json
+      - ./settings/navServices.json:/app/navServices.json
       - /run/systemd/system:/run/systemd/system
       - /bin/systemctl:/bin/systemctl
       - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
@@ -85,6 +86,7 @@ services:
       - ftp_settings_file=/ftp/ftpsettings.json
       - webapp1_host=ipc:///signals/blobApp
       - filterControl_file_path=/app/filterControls.json
+      - nav_services_file_path=/app/navServices.json
       - identifier_file_path=/license/identifier.enc
       - license_file_path=/license/license.lic
       - /mnt/data_directory=/history_images/
@@ -99,12 +101,12 @@ services:
       - ZMQ_USE_MSGPACK=false
     privileged: true
     working_dir: /app/appBackend
-    command: uvicorn appBackend:appASGI --host * --port 80 --log-level info
+    command: uvicorn appBackend:appASGI --host * --port 8000 --log-level info
     restart: unless-stopped
     network_mode: host
     cpuset: "0,1"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/api/frontend/current_time"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/frontend/current_time"]
       interval: 5s
       timeout: 2s
       retries: 5
@@ -127,10 +129,64 @@ services:
      - 3000:7681
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    command: ttyd --writable -t fontSize=20 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null raspberrypi@host.docker.internal
+    command: ttyd --writable -t fontSize=20 --base-path /ttyd ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null raspberrypi@host.docker.internal
     restart: unless-stopped
 
- 
+  vc-trigger:
+    image: ghcr.io/notavis-gmbh/notavis-mipi-trigger-public:0.2
+    ports:
+      - "8501:8501"
+    environment:
+      VC_TRIGGER_LOG_LEVEL: INFO
+      # Mock mode: UI works fully, GPIO 18 is never touched. Flip to "0" and
+      # uncomment devices/group_add below once the trigger wiring is
+      # confirmed and you want the container to actually drive GPIO 18.
+      VC_TRIGGER_MOCK: "1"
+    # devices:
+    #   - /dev/gpiochip0:/dev/gpiochip0
+    # group_add:
+    #   - "986"   # gpio group GID on this board (getent group gpio)
+    command:
+      - "--server.address=0.0.0.0"
+      - "--server.port=8501"
+      - "--server.headless=true"
+      - "--browser.gatherUsageStats=false"
+      - "--server.baseUrlPath=/trigger"
+      - "--server.enableCORS=false"
+      - "--server.enableXsrfProtection=false"
+    restart: unless-stopped
+    healthcheck:
+      # Overrides the image's default (which checks /_stcore/health at the
+      # root and would always fail once --server.baseUrlPath moves it).
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8501/trigger/_stcore/health', timeout=3).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  nginx:
+    image: nginx:alpine
+    network_mode: host
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      ttyd:
+        condition: service_started
+      vc-trigger:
+        condition: service_healthy
+  frpc:
+    image: ghcr.io/fatedier/frpc:v0.71.0
+    container_name: frpc
+    restart: unless-stopped
+    command: ["-c", "/etc/frp/frpc.toml"]
+    network_mode: host   # simplest way to reach localhost:22 on the client
+    volumes:
+      - ./frpc/frpc.toml:/etc/frp/frpc.toml:ro
+
+
 volumes:
   signals:
     driver: local
