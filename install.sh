@@ -458,7 +458,7 @@ setup_nvme_data_mount() {
     local ts
     ts=$(date +%Y%m%d-%H%M%S)
     sudo cp /etc/fstab "/etc/fstab.${ts}.bak"
-    echo "UUID=${uuid}  ${mnt}  ${fstype}  defaults,nofail  0  2" | sudo tee -a /etc/fstab >/dev/null
+    echo "UUID=${uuid}  ${mnt}  ${fstype}  defaults,noatime,data=writeback,commit=60,nobarrier  0  2" | sudo tee -a /etc/fstab >/dev/null
 
     sudo mount "$mnt"
 }
