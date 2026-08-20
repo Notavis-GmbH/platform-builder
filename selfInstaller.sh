@@ -1,5 +1,6 @@
 #!/bin/bash
 branch="ov9281"
+version="${1:-}" # optional git tag/ref; defaults to latest commit on $branch
 user=$(whoami)
 MIN_FREE_MB=500
 
@@ -23,7 +24,19 @@ if [ -d platform-builder ]; then
     scp -r  platform-builder/app_platform/license /opt/platform-builder/
   fi
     sudo chown -R "$(whoami):$(whoami)" ~/platform-builder # ensure user owns the dir
-    cd platform-builder && git fetch origin && git reset --hard HEAD && git clean -fd && git checkout -B $branch origin/$branch && git pull && bash install.sh
+    cd platform-builder && git fetch origin --tags && git reset --hard HEAD && git clean -fd
+    if [ -n "$version" ]; then
+      git checkout "$version"
+    else
+      git checkout -B $branch origin/$branch && git pull
+    fi
+    bash install.sh
 else
-  git clone https://github.com/Notavis-GmbH/platform-builder && cd platform-builder && git checkout -B $branch origin/$branch && git pull && bash install.sh
+  git clone https://github.com/Notavis-GmbH/platform-builder && cd platform-builder
+  if [ -n "$version" ]; then
+    git fetch --tags && git checkout "$version"
+  else
+    git checkout -B $branch origin/$branch && git pull
+  fi
+  bash install.sh
 fi
