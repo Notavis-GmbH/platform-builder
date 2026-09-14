@@ -11,6 +11,8 @@ echo "Starting platform installation..."
 LOGDIR="$HOME/.platform_installer_logs"
 mkdir -p "$LOGDIR"
 
+echo "Git branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown), commit: $(git rev-parse --short HEAD 2>/dev/null || echo unknown)" | tee "$LOGDIR/git_info.log"
+
 # step counter
 STEP_NO=0
 
@@ -90,7 +92,7 @@ run_step() {
     done
 
     # wait for process and capture exit code
-    wait "$cmd_pid" 2>/dev/null || true
+    wait "$cmd_pid" 2>/dev/null
     rc=$?
 
     # compute total elapsed and clear spinner line
@@ -181,10 +183,10 @@ table ip nat {
         oifname "end0" masquerade
 
         # Docker-Subnetze Masqueraden
-        ip saddr 172.17.0.0/16 oifname != "docker0" masq
-        ip saddr 172.18.0.0/16 oifname != "docker0" masq
-        ip saddr 172.19.0.0/16 oifname != "docker0" masq
-        ip saddr 192.168.0.0/16 oifname != "docker0" masq
+        ip saddr 172.17.0.0/16 oifname != "docker0" masquerade
+        ip saddr 172.18.0.0/16 oifname != "docker0" masquerade
+        ip saddr 172.19.0.0/16 oifname != "docker0" masquerade
+        ip saddr 192.168.0.0/16 oifname != "docker0" masquerade
     }
 }
 EOF
@@ -211,7 +213,51 @@ fi
 echo "Step 4: Unblocking Wi-Fi..."
 run_step "Unblock Wi-Fi and mask rfkill" "sudo rfkill unblock wifi && sudo systemctl mask rfkill.service && sudo systemctl mask rfkill.socket"
 
-#
+
+# Vision Components' vc_mipi_* kernel modules sometimes ship built into the
+# kernel image itself (under kernel/drivers/media/i2c/) at a newer version
+# than this pinned DKMS package. DKMS then refuses "dkms install" because the
+# module it's about to install isn't newer than what's already in the kernel
+# tree ("is not newer than what is already found in kernel ..."). We
+# temporarily patch dkms's shared postinst helper to force that one install,
+# then restore the original helper so other DKMS packages keep the default
+# safety check.
+install_vc_mipi_driver() {
+    local version="$1"
+    shift
+    local deb="vc-mipi-driver-bcm2712_${version}_arm64.deb"
+    local dkms_postinst="/usr/lib/dkms/common.postinst"
+    local backup="${dkms_postinst}.pre-vc-mipi-force.bak"
+
+    wget -N --timestamping "https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v${version}/${deb}" || return 1
+
+    sudo cp "$dkms_postinst" "$backup"
+    sudo sed -i 's/dkms install -m "$NAME" -v "$VERSION" -k "$KERNEL" ${ARCH:+-a "$ARCH"}$/&  --force/' "$dkms_postinst"
+
+    local rc=0
+    sudo apt install "./${deb}" -y "$@" || rc=$?
+
+    sudo cp "$backup" "$dkms_postinst"
+    sudo rm -f "$backup"
+
+    return $rc
+}
+
+reconfigure_vc_mipi_driver_forced() {
+    local dkms_postinst="/usr/lib/dkms/common.postinst"
+    local backup="${dkms_postinst}.pre-vc-mipi-force.bak"
+
+    sudo cp "$dkms_postinst" "$backup"
+    sudo sed -i 's/dkms install -m "$NAME" -v "$VERSION" -k "$KERNEL" ${ARCH:+-a "$ARCH"}$/&  --force/' "$dkms_postinst"
+
+    local rc=0
+    sudo dpkg --configure -a || rc=$?
+
+    sudo cp "$backup" "$dkms_postinst"
+    sudo rm -f "$backup"
+
+    return $rc
+}
 
 # Check if vc-mipi-driver-bcm2712 is already installed with the correct version
 echo "Step 6: Checking and installing vc-mipi-driver..."
@@ -221,26 +267,238 @@ PACKAGE_NAME="vc-mipi-driver-bcm2712"
 if dpkg -l | grep -q "^ii  ${PACKAGE_NAME}"; then
     INSTALLED_VERSION=$(dpkg -l | grep "^ii  ${PACKAGE_NAME}" | awk '{print $3}')
     echo "Found ${PACKAGE_NAME} version ${INSTALLED_VERSION}"
-    
+
     if [ "${INSTALLED_VERSION}" = "${REQUIRED_VERSION}" ]; then
         echo "${PACKAGE_NAME} version ${REQUIRED_VERSION} is already installed. Skipping installation."
     else
         echo "Installed version (${INSTALLED_VERSION}) does not match required version (${REQUIRED_VERSION}). Updating..."
-        run_step "Install vc-mipi-driver (update)" "wget -N --timestamping https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v0.6.7/vc-mipi-driver-bcm2712_0.6.7_arm64.deb && sudo apt install ./vc-mipi-driver-bcm2712_0.6.7_arm64.deb -y"
+        run_step "Install vc-mipi-driver (update)" -- install_vc_mipi_driver "${REQUIRED_VERSION}" --allow-downgrades
     fi
 else
     echo "${PACKAGE_NAME} is not installed. Installing version ${REQUIRED_VERSION}..."
-    run_step "Install vc-mipi-driver" "wget -N --timestamping https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v0.6.7/vc-mipi-driver-bcm2712_0.6.7_arm64.deb && sudo apt install ./vc-mipi-driver-bcm2712_0.6.7_arm64.deb -y"
+    run_step "Install vc-mipi-driver" -- install_vc_mipi_driver "${REQUIRED_VERSION}"
 fi
 
+# dpkg may have left the package half-configured from a previous failed run
+# (e.g. this exact "not newer than kernel" DKMS error). Retry configuration
+# with the same forced-install patch so the installer is idempotent.
+if dpkg -l | grep -q "^iF  ${PACKAGE_NAME}"; then
+    echo "${PACKAGE_NAME} is half-configured from a previous failed install. Retrying..."
+    run_step "Reconfigure vc-mipi-driver (forced)" -- reconfigure_vc_mipi_driver_forced
+fi
+
+echo "Step 7: Copying vc-mipi-driver config to /boot/firmware/..."
+run_step "Copy vc-mipi-driver config" "sudo cp config_vc-mipi-driver-bcm2712.txt /boot/firmware/"
+
+echo "Step 7a: Copying vc-mipi camera overlays to /boot/firmware/overlays/..."
+run_step "Copy vc-mipi camera overlays" "sudo cp vc-mipi-bcm2712-cam0.dtbo vc-mipi-bcm2712-cam1.dtbo /boot/firmware/overlays/"
+
+echo "Step 7b: Installing camera IRQ affinity service..."
+run_step "Install camera IRQ affinity" "bash installCameraIrqAffinity.sh"
+
+# Root cause found 2026-08-12 on UniversitySidney2 with drop-hunt sampler: default
+# writeback thresholds let 400-800 MB of dirty pages accumulate before flushing,
+# causing 1.8-2.7 s I/O stalls that drop frames during continuous BMP capture at
+# 60 fps. Lowering the thresholds flushes dirty pages sooner and in smaller bursts.
+install_writeback_sysctl() {
+    local src="resources/99-notavis-writeback.conf"
+    local dst="/etc/sysctl.d/99-notavis-writeback.conf"
+
+    if [ ! -f "$src" ]; then
+        echo "${src} not found; skipping writeback sysctl config." >&2
+        return 1
+    fi
+
+    sudo cp "$src" "$dst" && sudo sysctl --system
+}
+
+echo "Step 7c: Configuring writeback tuning to prevent capture drops..."
+run_step "Configure writeback sysctl tuning" -- install_writeback_sysctl
+
 # Add log limit to 10 mb for docker globally
-echo "Step 7: Configuring Docker logging..."
+echo "Step 8: Configuring Docker logging..."
 run_step "Configure Docker logging" "mkdir -p ~/.docker/ && cp resources/config.json ~/.docker/config.json"
 
-echo "Step 8: Starting raspap services..."
+echo "Step 9: Starting raspap services..."
 run_step "Start raspap services" "sudo docker compose -f docker-compose.raspap.yml up -d"
 
-echo "Step 9: Starting app platform services..."
+echo "Step 10: Starting app platform services..."
+
+# Some RPi5 NVMe HATs let the SSD controller drop into an unrecoverable low-power
+# state (D3cold) under PCIe ASPM/APST power management, which surfaces as
+# "controller is down" resets and the filesystem being shut down mid-write.
+# Disabling these power-saving features on the kernel command line prevents that.
+# Requires a reboot to take effect.
+configure_nvme_power_management() {
+    local cmdline="/boot/firmware/cmdline.txt"
+    local params="nvme_core.default_ps_max_latency_us=0 pcie_aspm=off pcie_port_pm=off"
+
+    if [ ! -f "$cmdline" ]; then
+        echo "${cmdline} not found; skipping NVMe power management config." >&2
+        return 0
+    fi
+
+    local missing=()
+    local p
+    for p in $params; do
+        grep -qw -- "$p" "$cmdline" || missing+=("$p")
+    done
+
+    if [ "${#missing[@]}" -eq 0 ]; then
+        echo "NVMe power management parameters already present in ${cmdline}."
+        return 0
+    fi
+
+    local ts
+    ts=$(date +%Y%m%d-%H%M%S)
+    sudo cp "$cmdline" "${cmdline}.${ts}.bak"
+
+    local current
+    current=$(cat "$cmdline")
+    echo "${current} ${missing[*]}" | sudo tee "$cmdline" >/dev/null
+
+    echo "Added NVMe power management parameters to ${cmdline}: ${missing[*]}"
+    echo "A reboot is required for this change to take effect."
+}
+
+run_step "Configure NVMe power management" -- configure_nvme_power_management
+
+# /mnt/data must be mounted to persistent storage (e.g. an SSD/NVMe) before the app
+# platform starts, otherwise docker will silently create /mnt/data on the root
+# filesystem instead. This step is mandatory: it requires exactly one unmounted NVMe
+# partition to act on (unless /mnt/data is already mounted or already in /etc/fstab);
+# any ambiguous or missing-hardware case fails the installation rather than silently
+# continuing on the root filesystem.
+setup_nvme_data_mount() {
+    local mnt="/mnt/data"
+
+    if mountpoint -q "$mnt"; then
+        echo "${mnt} is already mounted; nothing to do."
+        return 0
+    fi
+
+    if grep -qE "^[^#][^[:space:]]*[[:space:]]+${mnt}[[:space:]]" /etc/fstab; then
+        echo "${mnt} already has an /etc/fstab entry; attempting to mount it..."
+        sudo mkdir -p "$mnt"
+        sudo mount "$mnt"
+        return $?
+    fi
+
+    # Candidates: NVMe partitions that aren't mounted anywhere, split into ones that
+    # already have a filesystem and ones that are blank (no fstype, e.g. a fresh or
+    # freshly-wiped SSD).
+    local candidates=()
+    local blank_candidates=()
+    while read -r dev fstype mountpt; do
+        [ -z "$mountpt" ] || continue
+        if [ -n "$fstype" ]; then
+            candidates+=("$dev")
+        else
+            blank_candidates+=("$dev")
+        fi
+    done < <(lsblk -rno PATH,FSTYPE,MOUNTPOINT | grep -E '^/dev/nvme[0-9]+n[0-9]+p[0-9]+ ')
+
+    # A whole NVMe disk may have no partition table at all (e.g. nvme0n1 with no
+    # nvme0n1p1 child) — either blank (fresh/wiped SSD) or formatted directly without
+    # partitioning. Treat such unpartitioned, unmounted whole disks as candidates too.
+    while read -r dev fstype mountpt; do
+        [ -z "$mountpt" ] || continue
+        lsblk -rno PATH "$dev" | grep -q "^${dev}p[0-9]" && continue
+        if [ -n "$fstype" ]; then
+            candidates+=("$dev")
+        else
+            blank_candidates+=("$dev")
+        fi
+    done < <(lsblk -rno PATH,FSTYPE,MOUNTPOINT | grep -E '^/dev/nvme[0-9]+n[0-9]+ ')
+
+    # If there's no already-formatted candidate but exactly one blank NVMe partition
+    # or whole disk, format it as ext4 so a fresh/wiped SSD can be provisioned without
+    # manual steps.
+    if [ "${#candidates[@]}" -eq 0 ] && [ "${#blank_candidates[@]}" -eq 1 ]; then
+        local blank_part="${blank_candidates[0]}"
+        echo "Found unformatted NVMe device ${blank_part}; formatting as ext4."
+        if sudo mkfs.ext4 -F -L data "$blank_part"; then
+            candidates=("$blank_part")
+        else
+            echo "ERROR: Failed to format ${blank_part}." >&2
+            return 1
+        fi
+    elif [ "${#candidates[@]}" -eq 0 ] && [ "${#blank_candidates[@]}" -gt 1 ]; then
+        echo "ERROR: Multiple unformatted NVMe devices found (${blank_candidates[*]}); ambiguous, pick one manually and re-run." >&2
+        return 1
+    fi
+
+    if [ "${#candidates[@]}" -eq 0 ]; then
+        echo "ERROR: No unmounted NVMe partition found. NVMe storage is required for ${mnt}." >&2
+        return 1
+    fi
+    if [ "${#candidates[@]}" -gt 1 ]; then
+        echo "ERROR: Multiple unmounted NVMe partitions found (${candidates[*]}); ambiguous, pick one manually and re-run." >&2
+        return 1
+    fi
+
+    local part="${candidates[0]}" uuid fstype
+    uuid=$(sudo blkid -s UUID -o value "$part")
+    fstype=$(sudo blkid -s TYPE -o value "$part")
+
+    if [ -z "$uuid" ] || [ -z "$fstype" ]; then
+        echo "ERROR: Could not determine UUID/filesystem for ${part}." >&2
+        return 1
+    fi
+
+    echo "Found unmounted NVMe partition ${part} (${fstype}, UUID=${uuid}); mounting at ${mnt}."
+
+    if [ -d "$mnt" ] && [ -n "$(ls -A "$mnt" 2>/dev/null)" ]; then
+        echo "Note: ${mnt} already has content on the root filesystem. It will be hidden" \
+             "(not deleted) once the NVMe is mounted over it."
+    fi
+
+    sudo mkdir -p "$mnt"
+
+    local ts
+    ts=$(date +%Y%m%d-%H%M%S)
+    sudo cp /etc/fstab "/etc/fstab.${ts}.bak"
+    echo "UUID=${uuid}  ${mnt}  ${fstype}  defaults,noatime,data=writeback,commit=60,nobarrier  0  2" | sudo tee -a /etc/fstab >/dev/null
+
+    sudo mount "$mnt"
+}
+
+run_step "Mount NVMe to /mnt/data" -- setup_nvme_data_mount || exit 1
+
+# If /mnt/data ended up mounted (whether just now or already), make sure the
+# installing user owns it so app_platform can write to it without sudo.
+ensure_mnt_data_ownership() {
+    local mnt="/mnt/data"
+    if ! mountpoint -q "$mnt"; then
+        echo "${mnt} is not mounted; skipping ownership check."
+        return 0
+    fi
+
+    local owner
+    owner=$(stat -c '%U:%G' "$mnt")
+    if [ "$owner" = "$(id -un):$(id -gn)" ]; then
+        echo "${mnt} is already owned by $(id -un):$(id -gn)."
+    else
+        echo "${mnt} is owned by ${owner}; changing to $(id -un):$(id -gn)."
+        sudo chown "$(id -u):$(id -g)" "$mnt"
+    fi
+    sudo chmod 755 "$mnt"
+}
+
+run_step "Ensure /mnt/data ownership" -- ensure_mnt_data_ownership
+
+check_mnt_data_mounted() {
+    if ! mountpoint -q /mnt/data; then
+        echo "/mnt/data is not a mount point. Mount the SSD to /mnt/data before running this installer." >&2
+        return 1
+    fi
+}
+
+if ! run_step "Check /mnt/data is mounted" -- check_mnt_data_mounted; then
+    echo "Aborting: /mnt/data must be mounted to persistent storage first. Mount the SSD, then re-run the installer." >&2
+    exit 1
+fi
+
 run_step "Pull app platform images" "cd app_platform && sudo docker compose pull"
 run_step "Start app platform services" "cd app_platform && sudo docker compose up -d --remove-orphans"
 

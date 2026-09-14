@@ -1,0 +1,14 @@
+[
+    {
+        "id": "ttyd",
+        "label": "Terminal",
+        "url": "/ttyd/",
+        "icon": "terminal"
+    },
+    {
+        "id": "trigger",
+        "label": "Trigger",
+        "url": "/trigger/",
+        "icon": "output"
+    }
+]

@@ -1,0 +1,13 @@
+serverAddr = "frp.fls-engineering.de"   # or the server's public IP
+serverPort = 7000
+
+[auth]
+method = "token"
+token = "26c8cc984d5ef7c10b70a615fafd6508f193404c53f83f59"
+
+[[proxies]]
+name = "ssh-test"   # e.g. "ssh-nas", must be unique across all clients
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 22
+remotePort = 6000            # unique per device, within the 6000-6010 range

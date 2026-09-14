@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-08-14T05:53:54Z",
+  "git": {
+    "commit": "df838cc",
+    "commit_full": "df838ccbd27484886bdc4c8f8e395c4b8fa455f7",
+    "branch": "ov9281",
+    "remote": "https://github.com/Notavis-GmbH/platform-builder"
+  },
+  "docker_images": [{"image":"redis:7-alpine","repository":"redis","tag":"7-alpine","id":"e7723ff73d96","present_locally":true},{"image":"reg.fls-engineering.de/library/backend:2.4.0","repository":"reg.fls-engineering.de/library/backend","tag":"2.4.0","id":"612ff7d06660","present_locally":true},{"image":"reg.fls-engineering.de/library/cam_v4l2:2.7.0","repository":"reg.fls-engineering.de/library/cam_v4l2","tag":"2.7.0","id":"518e7f737757","present_locally":true},{"image":"reg.fls-engineering.de/library/ftpserver:1.4.0","repository":"reg.fls-engineering.de/library/ftpserver","tag":"1.4.0","id":"6333c130ec53","present_locally":true}]
+}
