@@ -499,8 +499,8 @@ if ! run_step "Check /mnt/data is mounted" -- check_mnt_data_mounted; then
     exit 1
 fi
 
-run_step "Pull app platform images" "cd app_platform && sudo docker compose pull"
-run_step "Start app platform services" "cd app_platform && sudo docker compose up -d --remove-orphans"
+run_step "Pull app platform images" "cd app_platform && sudo docker compose -f docker-compose.siemens.yml pull"
+run_step "Start app platform services" "cd app_platform && sudo docker compose -f docker-compose.siemens.yml up -d --remove-orphans"
 
 # echo "Step 10: Uninstalling autostart kiosk..."
 # run_step "Uninstall autostart kiosk" "sudo bash uninstallAutostartKiosk.sh"
