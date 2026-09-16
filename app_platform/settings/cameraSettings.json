@@ -60,7 +60,7 @@
         "name": "frameRate",
         "source": 3,
         "type": 3,
-        "value": 1
+        "value": 10.0
     },
     {
         "command": "set_value",
@@ -117,5 +117,12 @@
         "source": 3,
         "type": 4,
         "value": false
+    },
+    {
+        "command": "set_value",
+        "name": "Rotation",
+        "source": 3,
+        "type": 6,
+        "value": 90
     }
 ]
