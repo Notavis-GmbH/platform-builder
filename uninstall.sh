@@ -3,7 +3,7 @@
 # Uninstall script for the platform-builder installation performed by install.sh.
 #
 # Scope (app-level teardown): stops/removes the app_platform and raspap docker
-# compose services, removes the Firefox kiosk autostart, removes the
+# compose services, removes the Chromium kiosk autostart, removes the
 # vc-mipi-driver-bcm2712 package and its boot config, and cleans up installer
 # logs / build metadata.
 #
@@ -38,7 +38,7 @@ done
 
 if [ "$ASSUME_YES" -ne 1 ]; then
     echo "This will stop and remove the app_platform and raspap docker services,"
-    echo "remove the Firefox kiosk autostart, remove the vc-mipi-driver-bcm2712"
+    echo "remove the Chromium kiosk autostart, remove the vc-mipi-driver-bcm2712"
     echo "package, and clean up installer logs/build metadata."
     read -r -p "Continue? [y/N] " reply
     case "$reply" in

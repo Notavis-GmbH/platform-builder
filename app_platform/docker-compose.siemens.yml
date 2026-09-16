@@ -81,7 +81,6 @@ services:
       - /boot/:/boot/
       - ./ftp/:/ftp/
       - ./settings/backendSettings.json:/app/appBackend/backendSettings.json
-      - ../sources/v4l2-source/appBackend/appBackend.py:/app/appBackend/appBackend.py
       - ./settings/settings.json:/app/appBackend/settings.json
       - ./settings/filterControls.json:/app/filterControls.json
       - ./settings/runtimeSettings.json:/app/appBackend/runtimeSettings.json
@@ -214,7 +213,7 @@ services:
     network_mode: host
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - static_files:/usr/share/nginx/html:ro
+      - ./static_files:/usr/share/nginx/html:ro
     restart: unless-stopped
     depends_on:
       backend:
@@ -223,14 +222,14 @@ services:
         condition: service_started
       vc-trigger:
         condition: service_healthy
-  # frpc:
-  #   image: ghcr.io/fatedier/frpc:v0.71.0
-  #   container_name: frpc
-  #   restart: unless-stopped
-  #   command: ["-c", "/etc/frp/frpc.toml"]
-  #   network_mode: host   # simplest way to reach localhost:22 on the client
-  #   volumes:
-  #     - ./frpc/frpc.toml:/etc/frp/frpc.toml:ro
+  frpc:
+    image: ghcr.io/fatedier/frpc:v0.71.0
+    container_name: frpc
+    restart: unless-stopped
+    command: ["-c", "/etc/frp/frpc.toml"]
+    network_mode: host   
+    volumes:
+      - ./frpc/frpc.toml:/etc/frp/frpc.toml:ro
 
 
 volumes:

@@ -23,7 +23,7 @@ service:
   camera-irq-affinity:
     enabled: true
     running: true
-  firefox-kiosk:
+  chromium-kiosk:
     enabled: true
     running: true
 
@@ -170,7 +170,7 @@ file:
     - "/mnt/data"
 
   # --- Kiosk autostart ---
-  /etc/systemd/system/firefox-kiosk.service:
+  /etc/systemd/system/chromium-kiosk.service:
     exists: true
 
   # --- Build metadata ---

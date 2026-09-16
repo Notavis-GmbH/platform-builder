@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Uninstall the Cog kiosk autostart service and start script if installed.
+# Uninstall the Chromium kiosk autostart service and start script if installed.
+# Also removes the legacy Cog kiosk service from earlier installations.
 
 set -euo pipefail
 
@@ -13,25 +14,26 @@ if [ -z "$TARGET_USER" ] || [ ! -d "$TARGET_HOME" ]; then
 	exit 1
 fi
 
-SERVICE_NAME="cog-kiosk.service"
-SERVICE_PATH="/etc/systemd/system/${SERVICE_NAME}"
+SERVICE_NAMES=("chromium-kiosk.service" "cog-kiosk.service")
 START_SCRIPT="$TARGET_HOME/.local/bin/start_kiosk.sh"
 
-echo "Uninstalling Cog kiosk autostart for user: $TARGET_USER (home: $TARGET_HOME)"
+echo "Uninstalling Chromium kiosk autostart for user: $TARGET_USER (home: $TARGET_HOME)"
 
-# Stop and disable the system service if it exists
-if sudo systemctl list-unit-files | grep -q "^${SERVICE_NAME}" 2>/dev/null || [ -f "$SERVICE_PATH" ]; then
-	echo "Stopping and disabling ${SERVICE_NAME}..."
-	sudo systemctl stop "$SERVICE_NAME" 2>/dev/null || true
-	sudo systemctl disable "$SERVICE_NAME" 2>/dev/null || true
-	echo "Removing service file: $SERVICE_PATH"
-	sudo rm -f "$SERVICE_PATH"
-	sudo systemctl daemon-reload
-	sudo systemctl reset-failed
-	echo "Service ${SERVICE_NAME} removed."
-else
-	echo "Service ${SERVICE_NAME} not found; skipping systemd removal.";
-fi
+for SERVICE_NAME in "${SERVICE_NAMES[@]}"; do
+	SERVICE_PATH="/etc/systemd/system/${SERVICE_NAME}"
+	if sudo systemctl list-unit-files | grep -q "^${SERVICE_NAME}" 2>/dev/null || [ -f "$SERVICE_PATH" ]; then
+		echo "Stopping and disabling ${SERVICE_NAME}..."
+		sudo systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+		sudo systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+		echo "Removing service file: $SERVICE_PATH"
+		sudo rm -f "$SERVICE_PATH"
+		sudo systemctl daemon-reload
+		sudo systemctl reset-failed
+		echo "Service ${SERVICE_NAME} removed."
+	else
+		echo "Service ${SERVICE_NAME} not found; skipping systemd removal.";
+	fi
+done
 
 # Remove the user's start script if it exists
 if [ -f "$START_SCRIPT" ]; then
@@ -44,5 +46,8 @@ if [ -f "$START_SCRIPT" ]; then
 else
 	echo "Start script not present at $START_SCRIPT; skipping.";
 fi
+
+# The kiosk profile is intentionally kept so a reinstall keeps its state.
+echo "Kiosk profile left in place: $TARGET_HOME/.config/chromium-kiosk"
 
 echo "Uninstall complete."

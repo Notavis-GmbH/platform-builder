@@ -1,12 +1,12 @@
 [Unit]
-Description=Cog Kiosk Autostart
+Description=Chromium Kiosk Autostart
 After=graphical.target network-online.target
 
 [Service]
 User=raspberrypi
 Environment=XDG_RUNTIME_DIR=/run/user/1000
 Environment=WAYLAND_DISPLAY=wayland-0
-Environment=COG_PLATFORM_WL_VIEW_FULLSCREEN=1
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
 ExecStart=/home/raspberrypi/.local/bin/start_kiosk.sh
 Restart=always
 
