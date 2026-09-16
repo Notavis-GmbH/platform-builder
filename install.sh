@@ -261,7 +261,7 @@ reconfigure_vc_mipi_driver_forced() {
 
 # Check if vc-mipi-driver-bcm2712 is already installed with the correct version
 echo "Step 6: Checking and installing vc-mipi-driver..."
-REQUIRED_VERSION="0.6.10"
+REQUIRED_VERSION="0.7.0"
 PACKAGE_NAME="vc-mipi-driver-bcm2712"
 
 if dpkg -l | grep -q "^ii  ${PACKAGE_NAME}"; then

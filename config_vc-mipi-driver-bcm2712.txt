@@ -34,7 +34,7 @@
 
 dtoverlay=vc-mipi-bcm2712-cam0
 dtparam=cam0_lanes2
-dtparam=cam0_manu_ov
+dtparam=cam0_manu_sony
 dtparam=cam0_libcamera_off
 #dtparam=cam0_force_color
 
@@ -63,7 +63,7 @@ dtparam=cam0_libcamera_off
 
 dtoverlay=vc-mipi-bcm2712-cam1
 dtparam=cam1_lanes2
-dtparam=cam1_manu_ov
+dtparam=cam1_manu_sony
 dtparam=cam1_libcamera_off
 #dtparam=cam1_force_color
 
