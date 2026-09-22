@@ -296,6 +296,9 @@ run_step "Copy vc-mipi camera overlays" "sudo cp vc-mipi-bcm2712-cam0.dtbo vc-mi
 echo "Step 7b: Installing camera IRQ affinity service..."
 run_step "Install camera IRQ affinity" "bash installCameraIrqAffinity.sh"
 
+echo "Step 7b2: Installing CSI-2 pad format alignment service..."
+run_step "Install CSI pipeline format" "bash installCsiPipelineFormat.sh"
+
 # Root cause found 2026-08-12 on UniversitySidney2 with drop-hunt sampler: default
 # writeback thresholds let 400-800 MB of dirty pages accumulate before flushing,
 # causing 1.8-2.7 s I/O stalls that drop frames during continuous BMP capture at

@@ -1,0 +1,13 @@
+[Unit]
+Description=Align CSI-2 media pipeline pad formats with the camera sensor
+After=sysinit.target
+Before=docker.service
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/set-csi-pipeline-format.sh
+
+[Install]
+WantedBy=multi-user.target

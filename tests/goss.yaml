@@ -23,6 +23,9 @@ service:
   camera-irq-affinity:
     enabled: true
     running: true
+  csi-pipeline-format:
+    enabled: true
+    running: true
   chromium-kiosk:
     enabled: true
     running: true
@@ -143,6 +146,14 @@ file:
     filetype: file
     mode: "0755"
   /etc/systemd/system/camera-irq-affinity.service:
+    exists: true
+
+  # --- Step 7b2: CSI-2 pad format alignment ---
+  /usr/local/sbin/set-csi-pipeline-format.sh:
+    exists: true
+    filetype: file
+    mode: "0755"
+  /etc/systemd/system/csi-pipeline-format.service:
     exists: true
 
   # --- Step 7c: writeback / IO optimization ---
