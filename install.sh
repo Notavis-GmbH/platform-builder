@@ -297,8 +297,9 @@ if dpkg -l | grep -q "^iF  ${PACKAGE_NAME}"; then
     run_step "Reconfigure vc-mipi-driver (forced)" -- reconfigure_vc_mipi_driver_forced
 fi
 
+# The driver package's postinst overwrites this file with its defaults, so always copy ours afterwards
 echo "Step 7: Copying vc-mipi-driver config to /boot/firmware/..."
-run_step "Copy vc-mipi-driver config" "sudo cp config_vc-mipi-driver-bcm2712.txt /boot/firmware/"
+run_step "Copy vc-mipi-driver config" "sudo cp resources/config_vc-mipi-driver-bcm2712.txt /boot/firmware/"
 
 echo "Step 7a: Copying vc-mipi camera overlays to /boot/firmware/overlays/..."
 run_step "Copy vc-mipi camera overlays" "sudo cp vc-mipi-bcm2712-cam0.dtbo vc-mipi-bcm2712-cam1.dtbo /boot/firmware/overlays/"
