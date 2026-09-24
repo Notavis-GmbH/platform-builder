@@ -241,8 +241,21 @@ fi
 
 # Check if vc-mipi-driver-bcm2712 is already installed with the correct version
 echo "Step 6: Checking and installing vc-mipi-driver..."
-REQUIRED_VERSION="0.6.7"
+REQUIRED_VERSION="0.8.0"
 PACKAGE_NAME="vc-mipi-driver-bcm2712"
+
+DEB_FILE="${PACKAGE_NAME}_${REQUIRED_VERSION}_arm64.deb"
+DEB_URL="https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v${REQUIRED_VERSION}/${DEB_FILE}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Use the .deb shipped with the repo if present, otherwise download it
+if [ -f "${SCRIPT_DIR}/${DEB_FILE}" ]; then
+    echo "Found ${DEB_FILE} in repository, installing from local file."
+    DRIVER_INSTALL_CMD="sudo apt install '${SCRIPT_DIR}/${DEB_FILE}' -y"
+else
+    echo "${DEB_FILE} not found locally, downloading from GitHub."
+    DRIVER_INSTALL_CMD="wget -N --timestamping ${DEB_URL} && sudo apt install ./${DEB_FILE} -y"
+fi
 
 if dpkg -l | grep -q "^ii  ${PACKAGE_NAME}"; then
     INSTALLED_VERSION=$(dpkg -l | grep "^ii  ${PACKAGE_NAME}" | awk '{print $3}')
@@ -252,11 +265,11 @@ if dpkg -l | grep -q "^ii  ${PACKAGE_NAME}"; then
         echo "${PACKAGE_NAME} version ${REQUIRED_VERSION} is already installed. Skipping installation."
     else
         echo "Installed version (${INSTALLED_VERSION}) does not match required version (${REQUIRED_VERSION}). Updating..."
-        run_step "Install vc-mipi-driver (update)" "wget -N --timestamping https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v0.6.7/vc-mipi-driver-bcm2712_0.6.7_arm64.deb && sudo apt install ./vc-mipi-driver-bcm2712_0.6.7_arm64.deb -y"
+        run_step "Install vc-mipi-driver (update)" "${DRIVER_INSTALL_CMD}"
     fi
 else
     echo "${PACKAGE_NAME} is not installed. Installing version ${REQUIRED_VERSION}..."
-    run_step "Install vc-mipi-driver" "wget -N --timestamping https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v0.6.7/vc-mipi-driver-bcm2712_0.6.7_arm64.deb && sudo apt install ./vc-mipi-driver-bcm2712_0.6.7_arm64.deb -y"
+    run_step "Install vc-mipi-driver" "${DRIVER_INSTALL_CMD}"
 fi
 
 # Add log limit to 10 mb for docker globally
