@@ -160,7 +160,7 @@ services:
     restart: unless-stopped
 
   siemensstern:
-    image: reg.fls-engineering.de/library/siemensstern:1.1.0
+    image: reg.fls-engineering.de/library/siemensstern:1.2.0
     env_file:
       - .env
     environment:
