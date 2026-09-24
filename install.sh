@@ -226,16 +226,26 @@ install_vc_mipi_driver() {
     local version="$1"
     shift
     local deb="vc-mipi-driver-bcm2712_${version}_arm64.deb"
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local dkms_postinst="/usr/lib/dkms/common.postinst"
     local backup="${dkms_postinst}.pre-vc-mipi-force.bak"
 
-    wget -N --timestamping "https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v${version}/${deb}" || return 1
+    # Use the .deb shipped with the repo if present, otherwise download it
+    if [ -f "${script_dir}/${deb}" ]; then
+        echo "Found ${deb} in repository, installing from local file."
+        deb="${script_dir}/${deb}"
+    else
+        echo "${deb} not found locally, downloading from GitHub."
+        wget -N --timestamping "https://github.com/VC-MIPI-modules/vc_mipi_raspi/releases/download/v${version}/${deb}" || return 1
+        deb="./${deb}"
+    fi
 
     sudo cp "$dkms_postinst" "$backup"
     sudo sed -i 's/dkms install -m "$NAME" -v "$VERSION" -k "$KERNEL" ${ARCH:+-a "$ARCH"}$/&  --force/' "$dkms_postinst"
 
     local rc=0
-    sudo apt install "./${deb}" -y "$@" || rc=$?
+    sudo apt install "${deb}" -y "$@" || rc=$?
 
     sudo cp "$backup" "$dkms_postinst"
     sudo rm -f "$backup"
@@ -261,7 +271,7 @@ reconfigure_vc_mipi_driver_forced() {
 
 # Check if vc-mipi-driver-bcm2712 is already installed with the correct version
 echo "Step 6: Checking and installing vc-mipi-driver..."
-REQUIRED_VERSION="0.7.0"
+REQUIRED_VERSION="0.8.0"
 PACKAGE_NAME="vc-mipi-driver-bcm2712"
 
 if dpkg -l | grep -q "^ii  ${PACKAGE_NAME}"; then
