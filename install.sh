@@ -272,6 +272,10 @@ else
     run_step "Install vc-mipi-driver" "${DRIVER_INSTALL_CMD}"
 fi
 
+# The driver package's postinst overwrites this file with its defaults, so always copy ours afterwards
+echo "Step 6a: Copying vc-mipi-driver config to /boot/firmware/..."
+run_step "Copy vc-mipi-driver config" "sudo cp '${SCRIPT_DIR}/resources/config_vc-mipi-driver-bcm2712.txt' /boot/firmware/"
+
 # Add log limit to 10 mb for docker globally
 echo "Step 7: Configuring Docker logging..."
 run_step "Configure Docker logging" "mkdir -p ~/.docker/ && cp resources/config.json ~/.docker/config.json"
