@@ -1,5 +1,5 @@
 #!/bin/bash
-branch="ov9281"
+branch="develop"
 version="${1:-}" # optional git tag/ref; defaults to latest commit on $branch
 user=$(whoami)
 MIN_FREE_MB=500

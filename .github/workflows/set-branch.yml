@@ -1,0 +1,40 @@
+# Writes the current branch name into selfInstaller.sh and README.md so that
+# the installer fetched from a branch installs that same branch.
+name: Set installer branch
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  set-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Replace branch name
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          sed -i -E "s|^branch=\".*\"|branch=\"${BRANCH}\"|" selfInstaller.sh
+          sed -i -E \
+            -e "s|platform-builder/[^ ]+/selfInstaller\.sh|platform-builder/${BRANCH}/selfInstaller.sh|g" \
+            -e "s|latest commit on the \`[^\`]*\` branch|latest commit on the \`${BRANCH}\` branch|" \
+            README.md
+
+      - name: Commit changes
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          if git diff --quiet; then
+            echo "Branch name already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Set installer branch to ${BRANCH} [skip ci]"
+          git push
