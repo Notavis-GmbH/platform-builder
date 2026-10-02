@@ -7,6 +7,13 @@ fi
 
 echo "Starting platform installation..."
 
+# Ask for the sudo password once up front, then keep the sudo timestamp alive
+# so long-running steps never prompt again (prompts inside steps are hidden by the spinner)
+sudo -v || { echo "sudo authentication failed." >&2; exit 1; }
+( while kill -0 "$$" 2>/dev/null; do sudo -n -v 2>/dev/null; sleep 60; done ) &
+SUDO_KEEPALIVE_PID=$!
+trap 'kill "$SUDO_KEEPALIVE_PID" 2>/dev/null' EXIT
+
 # directory for per-step logs
 LOGDIR="$HOME/.platform_installer_logs"
 mkdir -p "$LOGDIR"

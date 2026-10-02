@@ -14,6 +14,8 @@ check_disk_space() {
   fi
 }
 
+sudo -v || { echo "sudo authentication failed." >&2; exit 1; } # ask for the password right at start
+
 cd  ~
 check_disk_space ~
 if [ -d platform-builder ]; then
