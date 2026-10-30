@@ -94,7 +94,7 @@ services:
         restart: true
 
   backend:
-    image: reg.fls-engineering.de/library/backend:2.5.0
+    image: reg.fls-engineering.de/library/backend:2.6.0
     volumes:
       - signals:/signals
       - images:/images
