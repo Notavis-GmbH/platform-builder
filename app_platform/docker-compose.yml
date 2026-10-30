@@ -118,9 +118,10 @@ services:
       - ./var:/version_info
       - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
       - ./static_files:/static_share
-      # Temporary for the latency measurement: appBackend.py of backend:2.5.0
-      # plus the metaData timestamps tCam/tSent. Remove after the measurement,
-      # it pins the code of 2.5.0 also for newer images.
+      # Temporary for the latency measurement: appBackend.py of backend:2.6.0
+      # plus the latency timestamps in metaData (tCam, tSent and the camera
+      # app's tSensor/tDequeue/tCamSend), see latency/patch_backend.py. Remove
+      # after the measurement, it pins the code of 2.6.0 also for newer images.
       - ./latency/appBackend.py:/app/appBackend/appBackend.py:ro
     cap_add:
       - SYS_BOOT

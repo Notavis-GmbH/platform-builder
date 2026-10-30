@@ -162,7 +162,7 @@ async def stream_image_raw(cameraConnection: CameraConnection):
         logger.error(f"Error encoding image: {e}")
         return
 
-    # Latenzmessung (latency-probe.js): Zeitpunkt der Uebergabe an socket.io
+    # Latenzmessung: Zeitpunkt der Uebergabe an socket.io
     cameraConnection.metaData["tSent"] = time.time()
     await sio.emit('image', json.dumps({"image": strImage,
                                         "size": cameraConnection.lastImage.shape,
@@ -182,7 +182,7 @@ async def stream_image_encoded(cameraConnection: CameraConnection):
 
     logger.debug(cameraConnection.imageShape)
 
-    # Latenzmessung (latency-probe.js): Zeitpunkt der Uebergabe an socket.io
+    # Latenzmessung: Zeitpunkt der Uebergabe an socket.io
     cameraConnection.metaData["tSent"] = time.time()
     payload = json.dumps({"image": cameraConnection.base64Image,
                                         "size": cameraConnection.imageShape,
@@ -216,7 +216,7 @@ async def stream_image_encoded(cameraConnection: CameraConnection):
 # liefert dennoch jeden Frame mit voller Rate an den Client.
 _app_latest_frame: dict = {}      # id -> letztes Rohbild, wartet auf App-Verarbeitung
 _app_worker_started: dict = {}    # id -> Worker-Task bereits gestartet?
-_app_latest_frame_time: dict = {} # id -> Empfangszeit des Bildes in _app_latest_frame (Latenzmessung)
+_app_latest_frame_time: dict = {} # id -> Zeitstempel des Bildes in _app_latest_frame (Latenzmessung)
 
 
 def _start_app_worker_if_needed(id: int):
@@ -246,10 +246,11 @@ async def _app_worker_loop(id: int):
         if frame is None:
             continue
         _app_latest_frame[id] = None
-        tCam = _app_latest_frame_time.get(id)
+        frameTimes = _app_latest_frame_time.get(id, {})
 
         try:
             cameraConnection = imageRouter.get_camera_connection(id)
+            cameraConnection.lastRawImage = frame
             for app in apps:
                 if (app.active and app.connected):
                     tStart = time.time()
@@ -281,8 +282,8 @@ async def _app_worker_loop(id: int):
 
                     tBeforeSend = time.time()
                     # Kein await bis zum json.dumps in stream_image_*: der
-                    # Kamera-Callback kann den Wert vorher nicht ueberschreiben.
-                    cameraConnection.metaData["tCam"] = tCam
+                    # Kamera-Callback kann die Werte vorher nicht ueberschreiben.
+                    cameraConnection.metaData.update(frameTimes)
                     if isinstance(results[0], dict) and "base64" in results[0] and results[0]["base64"] is not None:
                         cameraConnection.base64Image = results[0]["base64"]
                         cameraConnection.jpgResized = True
@@ -325,9 +326,11 @@ async def callback_image_received(message: dict, id: int):
     """Callback function for image received event"""
     cameraConnection = imageRouter.get_camera_connection(id)
     cameraConnection.metaData["fps"] = fps
-    # Latenzmessung: Empfangszeit des Kamerabildes im Backend (im App-Modus
-    # setzt der App-Worker den Wert des tatsaechlich gesendeten Bildes)
+    # Latenzmessung: Empfangszeit im Backend und Zeitstempel der Kamera-App
+    # (Unix-Sekunden): V4L2-Puffer, Dequeue, ZMQ-Versand
     cameraConnection.metaData["tCam"] = current_time
+    for key in ("tSensor", "tDequeue", "tCamSend"):
+        cameraConnection.metaData[key] = message.get(key)
     strImage = ""
     if(current_counter_client != 0 and current_counter_client + 40 < cameraConnection.counter and skipped_image_counter < 2  ):
         logger.info(f"Skip image {current_counter_client} {cameraConnection.counter} {skipped_image_counter}")
@@ -344,6 +347,8 @@ async def callback_image_received(message: dict, id: int):
         input = np.frombuffer(bytes(cameraConnection.lastImageEncoded), np.uint8)                           
 
         lastImage = cv2.imdecode(input, cv2.IMREAD_COLOR)
+        if lastImage is not None:
+            cameraConnection.lastRawImage = lastImage.copy()
         for app in apps:
             if (app.active and app.connected):
                 lastImage, results = await processImage(apps[0], lastImage)
@@ -377,6 +382,8 @@ async def callback_image_received(message: dict, id: int):
                 input = np.frombuffer(bytes(input), np.uint8)                          
 
                 lastImage = cv2.imdecode(input, cv2.IMREAD_COLOR)
+                if lastImage is not None:
+                    cameraConnection.lastRawImage = lastImage.copy()
                 lastImage, results = await processImage(apps[0], lastImage)
                 if lastImage is  not None:
                     cameraConnection.lastImage = lastImage
@@ -411,14 +418,16 @@ async def callback_image_received(message: dict, id: int):
             # Kopie uebergeben: die naechste Kamera-Nachricht ueberschreibt
             # lastImage sonst, bevor der Worker es liest.
             tCopyStart = time.time()
+            cameraConnection.lastRawImage = lastImage.copy()
             _app_latest_frame[id] = lastImage.copy()
-            _app_latest_frame_time[id] = current_time
+            _app_latest_frame_time[id] = {key: cameraConnection.metaData.get(key) for key in ("tCam", "tSensor", "tDequeue", "tCamSend")}
             tCopyDur = time.time() - tCopyStart
             if tCopyDur > 0.005:
                 logger.info(f"[Callback] lastImage.copy() dauerte {tCopyDur:.3f}s (Bildform {lastImage.shape})")
         else:
             cameraConnection.results = []
             cameraConnection.lastImage = lastImage
+            cameraConnection.lastRawImage = lastImage
             cameraConnection.lastImageEncoded = None
             cameraConnection.base64Image = message["base64"]
             cameraConnection.imageShape = itemgetter('rows', 'cols', 'channels')(message["dataformat"])
@@ -433,6 +442,8 @@ async def callback_image_received(message: dict, id: int):
 
     else: #raw
         lastImage = cameraConnection.image_source.castImage(message)
+        if lastImage is not None:
+            cameraConnection.lastRawImage = lastImage.copy()
         for app in apps:
             if (app.active and app.connected):
                 lastImage = await processImage(apps[0], lastImage)
@@ -633,12 +644,7 @@ class SPAStaticFiles(StaticFiles):
      
 
 importlib.import_module("routers.SocketIO")
-
-SERVE_STATIC = os.getenv("SERVE_STATIC", "true").lower() in ("1", "true", "yes", "on")
-if SERVE_STATIC:
-    app.mount("/", SPAStaticFiles(directory="static", html=True), name="static")
-else:
-    logger.info("SERVE_STATIC is disabled - static frontend files are expected to be served by a reverse proxy (e.g. nginx)")
+app.mount("/", SPAStaticFiles(directory=os.path.join(os.path.dirname(os.path.abspath(__file__)), "static"), html=True), name="static")
 
 
 async def sendlastStatus():
