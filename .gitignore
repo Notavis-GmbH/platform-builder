@@ -21,3 +21,5 @@ vc-mipi-driver-bcm2712_**
 
 app_platform/.env
 **/__pycache__/**
+# Device-specific compose overrides (e.g. no FTDI adapter, latency test images)
+app_platform/docker-compose.override.yml
