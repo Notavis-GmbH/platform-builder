@@ -1,10 +1,10 @@
 {
-  "timestamp": "2026-09-15T08:31:50Z",
+  "timestamp": "2026-10-02T10:37:31Z",
   "git": {
-    "commit": "1953180",
-    "commit_full": "1953180a7b5c4adddefe0bee0335e614de11bb49",
+    "commit": "52e631e",
+    "commit_full": "52e631e1e9a9f88e6372340f7dfc0e3864cf681d",
     "branch": "feat/siemens2",
-    "remote": "https://github.com/Notavis-GmbH/platform-builder.git"
+    "remote": "https://github.com/Notavis-GmbH/platform-builder"
   },
-  "docker_images": [{"image":"ghcr.io/notavis-gmbh/notavis-mipi-trigger-public:0.2","repository":"ghcr.io/notavis-gmbh/notavis-mipi-trigger-public","tag":"0.2","id":"6bc9984580e5","present_locally":true},{"image":"nginx:alpine","repository":"nginx","tag":"alpine","id":"72ba65eb42c1","present_locally":true},{"image":"redis:7-alpine","repository":"redis","tag":"7-alpine","id":"ff02b58f971e","present_locally":true},{"image":"reg.fls-engineering.de/library/backend:2.5.0","repository":"reg.fls-engineering.de/library/backend","tag":"2.5.0","id":"","present_locally":false},{"image":"reg.fls-engineering.de/library/cam_v4l2:3.0.0","repository":"reg.fls-engineering.de/library/cam_v4l2","tag":"3.0.0","id":"39974a19c544","present_locally":true},{"image":"reg.fls-engineering.de/library/ftdi:2.0.0","repository":"reg.fls-engineering.de/library/ftdi","tag":"2.0.0","id":"b161557508ea","present_locally":true},{"image":"reg.fls-engineering.de/library/ftpserver:1.4.0","repository":"reg.fls-engineering.de/library/ftpserver","tag":"1.4.0","id":"6333c130ec53","present_locally":true},{"image":"reg.fls-engineering.de/library/siemensstern:1.1.0","repository":"reg.fls-engineering.de/library/siemensstern","tag":"1.1.0","id":"ec21944da664","present_locally":true}]
+  "docker_images": [{"image":"ghcr.io/notavis-gmbh/notavis-mipi-trigger-public:0.2","repository":"ghcr.io/notavis-gmbh/notavis-mipi-trigger-public","tag":"0.2","id":"6bc9984580e5","present_locally":true},{"image":"nginx:alpine","repository":"nginx","tag":"alpine","id":"df221db836e1","present_locally":true},{"image":"redis:7-alpine","repository":"redis","tag":"7-alpine","id":"858f009f9709","present_locally":true},{"image":"reg.fls-engineering.de/library/backend:2.5.0","repository":"reg.fls-engineering.de/library/backend","tag":"2.5.0","id":"","present_locally":false},{"image":"reg.fls-engineering.de/library/cam_v4l2:3.0.0","repository":"reg.fls-engineering.de/library/cam_v4l2","tag":"3.0.0","id":"53340a245686","present_locally":true},{"image":"reg.fls-engineering.de/library/ftdi:2.0.0","repository":"reg.fls-engineering.de/library/ftdi","tag":"2.0.0","id":"b161557508ea","present_locally":true},{"image":"reg.fls-engineering.de/library/ftpserver:1.4.0","repository":"reg.fls-engineering.de/library/ftpserver","tag":"1.4.0","id":"6333c130ec53","present_locally":true},{"image":"reg.fls-engineering.de/library/siemensstern:1.2.0","repository":"reg.fls-engineering.de/library/siemensstern","tag":"1.2.0","id":"0c57e58e50dc","present_locally":true}]
 }

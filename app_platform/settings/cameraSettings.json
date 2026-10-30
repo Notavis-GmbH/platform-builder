@@ -4,7 +4,7 @@
         "name": "9963793",
         "source": 0,
         "type": 0,
-        "value": 300
+        "value": 9435
     },
     {
         "command": "set_value",
@@ -60,14 +60,14 @@
         "name": "frameRate",
         "source": 3,
         "type": 3,
-        "value": 10.0
+        "value": 12.5
     },
     {
         "command": "set_value",
         "name": "10026992",
         "source": 0,
-        "type": 0,
-        "value": 1
+        "type": 6,
+        "value": 0
     },
     {
         "command": "set_value",
