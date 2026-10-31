@@ -246,10 +246,14 @@ services:
     image: ghcr.io/fatedier/frpc:v0.71.0
     container_name: frpc
     restart: unless-stopped
-    command: ["-c", "/etc/frp/frpc.toml"]
-    network_mode: host   
+    # Device-specific settings (remotePort, proxy name) go into
+    # frpc/frpc.local.toml: not in git, so the git reset of the installer keeps
+    # it. Without it the default frpc.toml is used.
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["if [ -f /etc/frp/frpc.local.toml ]; then exec frpc -c /etc/frp/frpc.local.toml; else exec frpc -c /etc/frp/frpc.toml; fi"]
+    network_mode: host
     volumes:
-      - ./frpc/frpc.toml:/etc/frp/frpc.toml:ro
+      - ./frpc:/etc/frp:ro
 
 
 volumes:

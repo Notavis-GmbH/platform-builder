@@ -341,6 +341,17 @@ echo "Step 10: Starting app platform services..."
 # Compose file of the app platform, used for pull/up, the space check and the
 # build metadata
 APP_COMPOSE_FILE="app_platform/docker-compose.siemens.yml"
+# Device-specific settings (not in git, so the git reset of selfInstaller.sh
+# keeps them) go into app_platform/docker-compose.override.yml, loaded on top
+# of the compose file. Arguments relative to app_platform/.
+APP_COMPOSE_ARGS="-f $(basename "$APP_COMPOSE_FILE")"
+if [ -f app_platform/docker-compose.override.yml ]; then
+    APP_COMPOSE_ARGS="$APP_COMPOSE_ARGS -f docker-compose.override.yml"
+    echo "Using device overrides: app_platform/docker-compose.override.yml"
+fi
+app_compose() {
+    (cd app_platform && sudo docker compose $APP_COMPOSE_ARGS "$@")
+}
 
 # Remove images no container uses (old tags after an update, test images) and
 # the build cache. Images of stopped containers are kept.
@@ -360,7 +371,7 @@ prune_images_before_pull() {
     mapfile -t keep < <(
         sudo docker ps -aq | xargs -r sudo docker inspect --format '{{.Image}}'
         {
-            sudo docker compose -f "$APP_COMPOSE_FILE" config --images 2>/dev/null
+            app_compose config --images 2>/dev/null
             sudo docker compose -f docker-compose.raspap.yml config --images 2>/dev/null
         } | xargs -r -n1 sudo docker image inspect --format '{{.Id}}' 2>/dev/null
     )
@@ -392,7 +403,7 @@ check_image_space() {
     arch=$(sudo docker info --format '{{.Architecture}}' 2>/dev/null)
     case "$arch" in aarch64) arch=arm64 ;; x86_64) arch=amd64 ;; esac
 
-    mapfile -t images < <(sudo docker compose -f "$APP_COMPOSE_FILE" config --images 2>/dev/null | sort -u)
+    mapfile -t images < <(app_compose config --images 2>/dev/null | sort -u)
     for img in "${images[@]}"; do
         if sudo docker image inspect "$img" >/dev/null 2>&1; then
             continue
@@ -439,8 +450,8 @@ if ! run_step "Check disk space for new images" -- check_image_space; then
     echo -e "${RED}Aborting: not enough disk space for the new images, the running services were not changed.${RESET}"
     exit 1
 fi
-run_step "Pull app platform images" "cd app_platform && sudo docker compose -f docker-compose.siemens.yml pull"
-run_step "Start app platform services" "cd app_platform && sudo docker compose -f docker-compose.siemens.yml up -d --remove-orphans"
+run_step "Pull app platform images" "cd app_platform && sudo docker compose $APP_COMPOSE_ARGS pull"
+run_step "Start app platform services" "cd app_platform && sudo docker compose $APP_COMPOSE_ARGS up -d --remove-orphans"
 # The old versions of updated images are no longer used by any container now
 run_step "Remove old docker images" -- prune_unused_images
 
