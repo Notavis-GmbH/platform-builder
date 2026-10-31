@@ -338,9 +338,86 @@ run_step "Start raspap services" "sudo docker compose -f docker-compose.raspap.y
 
 echo "Step 10: Starting app platform services..."
 
+# Compose file of the app platform, used for pull/up, the space check and the
+# build metadata
+APP_COMPOSE_FILE="app_platform/docker-compose.siemens.yml"
 
+# Remove images no container uses (old tags after an update, test images) and
+# the build cache. Images of stopped containers are kept.
+prune_unused_images() {
+    sudo docker image prune -af
+    sudo docker builder prune -af
+    df -h /var/lib/containerd /var/lib/docker 2>/dev/null
+}
+
+# Abort before pulling if the images that are not on the device yet would not
+# fit: a new tag of a big image (backend ~1.5 GB) is pulled while the old one
+# is still in use, both are on the disk until the cleanup after the start.
+# Needed space per missing image: compressed size from the registry x 4
+# (compressed blobs + unpacked layers, measured 3.7x for backend 2.6.0),
+# plus IMAGE_SPACE_RESERVE_MB for the system. SKIP_IMAGE_SPACE_CHECK=1 skips it.
+IMAGE_SPACE_FACTOR=4
+IMAGE_SPACE_RESERVE_MB=500
+check_image_space() {
+    if [ "${SKIP_IMAGE_SPACE_CHECK:-0}" = "1" ]; then
+        echo "SKIP_IMAGE_SPACE_CHECK=1 - skipping the check"
+        return 0
+    fi
+    local arch needed_mb=0 img size_mb avail_mb store
+    arch=$(sudo docker info --format '{{.Architecture}}' 2>/dev/null)
+    case "$arch" in aarch64) arch=arm64 ;; x86_64) arch=amd64 ;; esac
+
+    mapfile -t images < <(sudo docker compose -f "$APP_COMPOSE_FILE" config --images 2>/dev/null | sort -u)
+    for img in "${images[@]}"; do
+        if sudo docker image inspect "$img" >/dev/null 2>&1; then
+            continue
+        fi
+        # compressed size of the layers for this architecture (image index or single manifest)
+        size_mb=$(sudo docker manifest inspect -v "$img" 2>/dev/null | python3 -c '
+import json, sys
+arch = sys.argv[1]
+try:
+    data = json.load(sys.stdin)
+except ValueError:
+    sys.exit(0)
+for entry in data if isinstance(data, list) else [data]:
+    platform = entry.get("Descriptor", {}).get("platform", {})
+    if platform.get("architecture", arch) != arch:
+        continue
+    manifest = entry.get("OCIManifest") or entry.get("SchemaV2Manifest") or {}
+    print(sum(layer["size"] for layer in manifest.get("layers", [])) // 1000000)
+    break
+' "$arch")
+        if [ -z "$size_mb" ]; then
+            echo "WARNING: size of $img unknown (built locally or registry not reachable), not counted"
+            continue
+        fi
+        echo "missing: $img (${size_mb} MB compressed, ~$((size_mb * IMAGE_SPACE_FACTOR)) MB on disk)"
+        needed_mb=$((needed_mb + size_mb * IMAGE_SPACE_FACTOR))
+    done
+
+    # The image store of the containerd snapshotter, older setups use /var/lib/docker
+    store=/var/lib/containerd
+    [ -d "$store" ] || store=/var/lib/docker
+    avail_mb=$(df --output=avail -BM "$store" | tail -1 | tr -dc '0-9')
+    needed_mb=$((needed_mb + IMAGE_SPACE_RESERVE_MB))
+    echo "needed: ${needed_mb} MB (incl. ${IMAGE_SPACE_RESERVE_MB} MB reserve), available on $store: ${avail_mb} MB"
+    if [ "$avail_mb" -lt "$needed_mb" ]; then
+        echo "ERROR: not enough disk space for the new images. Free $((needed_mb - avail_mb)) MB" \
+             "(e.g. history images in app_platform/history_images) or set SKIP_IMAGE_SPACE_CHECK=1." >&2
+        return 1
+    fi
+}
+
+run_step "Remove unused docker images" -- prune_unused_images
+if ! run_step "Check disk space for new images" -- check_image_space; then
+    echo -e "${RED}Aborting: not enough disk space for the new images, the running services were not changed.${RESET}"
+    exit 1
+fi
 run_step "Pull app platform images" "cd app_platform && sudo docker compose -f docker-compose.siemens.yml pull"
 run_step "Start app platform services" "cd app_platform && sudo docker compose -f docker-compose.siemens.yml up -d --remove-orphans"
+# The old versions of updated images are no longer used by any container now
+run_step "Remove old docker images" -- prune_unused_images
 
 # echo "Step 10: Uninstalling autostart kiosk..."
 # run_step "Uninstall autostart kiosk" "sudo bash uninstallAutostartKiosk.sh"
@@ -374,7 +451,8 @@ record_build_info() {
     GIT_REMOTE=$(git config --get remote.origin.url 2>/dev/null || echo "")
 
     images_json="[]"
-    compose_file="app_platform/docker-compose.yml"
+    # the compose file the services are started with (see Step 10)
+    compose_file="$APP_COMPOSE_FILE"
     if [ -f "$compose_file" ]; then
         # extract image: lines (ignore commented lines) and trim quotes
         mapfile -t compose_images < <(

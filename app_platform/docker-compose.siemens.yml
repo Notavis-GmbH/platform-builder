@@ -16,6 +16,8 @@ services:
       - signals:/signals
       - /dev/ttyUSB0:/dev/ttyUSB0
       - ./ftdi_service.py:/app/ftdi_service.py
+      - ./camera_sensor.py:/app/camera_sensor.py
+      - ./gpio_control.py:/app/gpio_control.py
     # command: tail -f /dev/null  # Placeholder command to keep container running; replace with actual command as needed
     # command: python3 -m watchfiles "python3 ftdi_service.py"
     environment:
@@ -25,6 +27,20 @@ services:
       - STATUS_CHANNEL=camera_status
       - SIMULATION_MODE=False
       - SERIAL_PORT=/dev/ttyUSB0
+      # Set in .env, defaults: ftdi / true
+      # ftdi: power on RTS / button on CTS of the FTDI adapter
+      # gpio: power and button on header GPIOs (BCM numbers)
+      - CONTROL_INTERFACE=${CONTROL_INTERFACE:-ftdi}
+      # true: start the camera when the service starts, false: power off until the first start
+      - START_CAMERA_AT_STARTUP=${START_CAMERA_AT_STARTUP:-true}
+      - GPIO_POWER_PIN=22          # pin 15, relay module (active low): 0 V = camera power ON
+      - GPIO_POWER_ON_LEVEL=low
+      - GPIO_BUTTON_PIN=27         # pin 13, button to GND (pin 14)
+      - GPIO_BUTTON_ACTIVE=low
+      - GPIO_BUTTON_BIAS=pull-up
+      - CAMERA_I2C_DEVICES=10-001a,0-001a
+      - SENSOR_POLL_INTERVAL=0.05
+      - CAMERA_AUTOSTART=OFF
     privileged: true
     restart: unless-stopped
     depends_on:
@@ -57,6 +73,10 @@ services:
       - CAMERA_MAX_WIDTH_JPG=1000
       - CAMERA_SENDJPG=ON
       - CAMERA_SETCONTROLS_AT_RESUME=ON
+      # Sensor power is switched by the ftdi service (relay): only stream on the
+      # start command, a stream start with the power off crashes rp1-cfe
+      # (needs cam_v4l2 with CAMERA_AUTOSTART support, ignored by older images)
+      - CAMERA_AUTOSTART=OFF
       - CAMERA_MAX_FRAMERATE=100000
       - CAMERA_SAVE_FOLDER=/history_images
       - CAMERA_SAVE_RAW=ON
