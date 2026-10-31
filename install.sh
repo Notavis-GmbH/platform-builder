@@ -350,6 +350,31 @@ prune_unused_images() {
     df -h /var/lib/containerd /var/lib/docker 2>/dev/null
 }
 
+# Before the pull: remove only images that no container uses and that the
+# compose files do not reference either - a referenced image without a
+# container (e.g. after a manual test) would otherwise be pulled again.
+prune_images_before_pull() {
+    local id ref
+    # Compared by image ID: containers of locally built images (ttyd) only
+    # show the ID, compose lists them without the :latest tag
+    mapfile -t keep < <(
+        sudo docker ps -aq | xargs -r sudo docker inspect --format '{{.Image}}'
+        {
+            sudo docker compose -f "$APP_COMPOSE_FILE" config --images 2>/dev/null
+            sudo docker compose -f docker-compose.raspap.yml config --images 2>/dev/null
+        } | xargs -r -n1 sudo docker image inspect --format '{{.Id}}' 2>/dev/null
+    )
+    while read -r id ref; do
+        if ! printf '%s\n' "${keep[@]}" | grep -qxF "$id"; then
+            echo "removing $ref"
+            sudo docker rmi "$ref"
+        fi
+    done < <(sudo docker images --no-trunc --format '{{.ID}} {{.Repository}}:{{.Tag}}' | grep -v '<none>')
+    sudo docker image prune -f
+    sudo docker builder prune -af
+    df -h /var/lib/containerd /var/lib/docker 2>/dev/null
+}
+
 # Abort before pulling if the images that are not on the device yet would not
 # fit: a new tag of a big image (backend ~1.5 GB) is pulled while the old one
 # is still in use, both are on the disk until the cleanup after the start.
@@ -409,7 +434,7 @@ for entry in data if isinstance(data, list) else [data]:
     fi
 }
 
-run_step "Remove unused docker images" -- prune_unused_images
+run_step "Remove unused docker images" -- prune_images_before_pull
 if ! run_step "Check disk space for new images" -- check_image_space; then
     echo -e "${RED}Aborting: not enough disk space for the new images, the running services were not changed.${RESET}"
     exit 1
