@@ -160,7 +160,9 @@ services:
       - SERVE_STATIC=false
     privileged: true
     working_dir: /app/appBackend
-    command: uvicorn appBackend:appASGI --host '*' --port 8000 --log-level info
+    # No WebSocket compression: the live images are base64 JPEG (barely
+    # compressible), zlib cost ~45 ms per image and browser (WuH003, 5 MP)
+    command: uvicorn appBackend:appASGI --host '*' --port 8000 --log-level info --ws-per-message-deflate false
     restart: unless-stopped
     network_mode: host
     cpuset: "0,1"
