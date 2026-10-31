@@ -195,7 +195,7 @@ services:
     restart: unless-stopped
 
   siemensstern:
-    image: reg.fls-engineering.de/library/siemensstern:1.3.0
+    image: reg.fls-engineering.de/library/siemensstern:1.4.0
     env_file:
       - .env
     environment:
@@ -206,6 +206,9 @@ services:
       - SIEMENS_VISUALIZATION_INTERVAL=5
       - SIEMENS_DEBUG=OFF
       - SIEMENS_SETTINGS_FILENAME=/settings/siemenssternSettings.json
+      # Position detection on a downscaled image first, refined around the
+      # best candidates (5 MP: ~240 ms -> ~50 ms per detection)
+      - SIEMENS_POSITION_COARSE_TO_FINE=ON
     volumes:
       - signals:/signals
       - ./template.png:/app/template.png
