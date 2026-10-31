@@ -45,12 +45,10 @@ services:
       - redis
 
   camera:
-    # 3.0.2-latency: local build (latency/build_camera.sh) of isp_raspi4 incl.
-    # the CAMERA_AUTOSTART patch - 3.0.0 does NOT support CAMERA_AUTOSTART and
-    # streams on every container start, with the sensor powered off that
-    # crashes rp1-cfe. Adds the V4L2 buffer timestamps tSensor/tDequeue/tCamSend
-    # and CAMERA_SKIP_OLD_FRAMES.
-    image: reg.fls-engineering.de/library/cam_v4l2:3.0.2-latency
+    # 3.1.0: CAMERA_AUTOSTART (3.0.0 ignores it and streams on every container
+    # start - with the sensor powered off that crashes rp1-cfe), V4L2 latency
+    # timestamps and CAMERA_SKIP_OLD_FRAMES
+    image: reg.fls-engineering.de/library/cam_v4l2:3.1.0
     working_dir: /test
     volumes:
       - signals:/signals
