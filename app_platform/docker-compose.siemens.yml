@@ -46,10 +46,11 @@ services:
     depends_on:
       - redis
   camera:
-    # 3.1.0: CAMERA_AUTOSTART (3.0.0 ignores it and streams on every container
+    # 3.2.0: CAMERA_AUTOSTART (3.0.0 ignores it and streams on every container
     # start - with the sensor powered off that crashes rp1-cfe), V4L2 latency
-    # timestamps and CAMERA_SKIP_OLD_FRAMES
-    image: reg.fls-engineering.de/library/cam_v4l2:3.1.0
+    # timestamps, CAMERA_SKIP_OLD_FRAMES, CAMERA_COPY_BEFORE_CONVERT,
+    # CAMERA_DISABLE_BASE64
+    image: reg.fls-engineering.de/library/cam_v4l2:3.2.0
     working_dir: /test
     volumes:
       - signals:/signals
@@ -88,6 +89,12 @@ services:
       # Always process the newest V4L2 buffer, hand older ones back to the
       # driver: no stale frames when the sensor is faster than the processing
       - CAMERA_SKIP_OLD_FRAMES=ON
+      # Copy the uncached V4L2 buffer once before the 16 -> 8 bit conversion
+      # (5 MP: 62 ms -> 21 ms)
+      - CAMERA_COPY_BEFORE_CONVERT=ON
+      # No preview JPEG from the camera: the live image is rendered by
+      # siemensstern (app_active=True). Turn OFF for setups without an app.
+      - CAMERA_DISABLE_BASE64=ON
     network_mode: host
     privileged: true
     restart: unless-stopped
