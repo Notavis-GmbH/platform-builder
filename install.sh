@@ -7,9 +7,22 @@ fi
 
 echo "Starting platform installation..."
 
-# directory for per-step logs
+# Keep running when the terminal goes away (e.g. the ttyd web console is
+# restarted by the update), the steps write their output to log files
+trap '' HUP
+
+# Ask for the sudo password once up front, then keep the sudo timestamp alive
+# so long-running steps never prompt again (prompts inside steps are hidden by the spinner)
+sudo -v || sudo -n true || { echo "sudo authentication failed." >&2; exit 1; }
+( while kill -0 "$$" 2>/dev/null; do sudo -n -v 2>/dev/null; sleep 60; done ) &
+SUDO_KEEPALIVE_PID=$!
+trap 'kill "$SUDO_KEEPALIVE_PID" 2>/dev/null' EXIT
+
+# directory for per-step logs, only of this run
 LOGDIR="$HOME/.platform_installer_logs"
 mkdir -p "$LOGDIR"
+rm -f "$LOGDIR"/*.log
+FAILED_STEPS=()
 
 echo "Git branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown), commit: $(git rev-parse --short HEAD 2>/dev/null || echo unknown)" | tee "$LOGDIR/git_info.log"
 
@@ -125,6 +138,7 @@ run_step() {
         echo -e "${RED}Last 100 lines of log (${logfile}):${RESET}"
         tail -n 100 "$logfile" | sed 's/^/  /'
         echo -e "Full log available at: ${BLUE}${logfile}${RESET}"
+        FAILED_STEPS+=("Step ${STEP_NO}: ${title}")
         return $rc
     fi
 }
@@ -338,6 +352,26 @@ run_step "Start raspap services" "sudo docker compose -f docker-compose.raspap.y
 
 echo "Step 10: Starting app platform services..."
 
+# Device data is not in git (see selfInstaller.sh): create the missing files
+# from app_platform/defaults/ - existing ones are never overwritten. Must run
+# before the services start: docker creates a directory for a missing
+# bind-mounted file.
+ensure_device_files() {
+    local f target
+    while IFS= read -r f; do
+        target="app_platform/${f#./}"
+        if [ -d "$target" ] && [ -z "$(ls -A "$target")" ]; then
+            rmdir "$target" || sudo rmdir "$target"   # empty dir created by docker for a missing file
+        fi
+        if [ ! -e "$target" ]; then
+            mkdir -p "$(dirname "$target")"
+            cp -p "app_platform/defaults/${f#./}" "$target"
+            echo "created $target from defaults"
+        fi
+    done < <(cd app_platform/defaults && find . -type f)
+}
+run_step "Create missing device files from defaults" -- ensure_device_files
+
 # Compose file of the app platform, used for pull/up, the space check and the
 # build metadata
 APP_COMPOSE_FILE="app_platform/docker-compose.siemens.yml"
@@ -467,6 +501,8 @@ archive_installer_logs() {
         sudo mkdir -p /var/log/platform-installer
         sudo cp "$TAR" /var/log/platform-installer/
         echo "Archived installer logs to $TAR and copied to /var/log/platform-installer/"
+        # keep the last 5 archives in the home directory
+        ls -1t "$HOME"/platform_install_logs_*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f
     else
         echo "No installer logs found at $LOGDIR"
     fi
@@ -568,4 +604,11 @@ run_step "Install autostart kiosk service" "bash installAutostartKiosk.sh"
 
 run_step "Record build metadata" -- record_build_info
 
-echo "Platform installation completed successfully!"
+if [ ${#FAILED_STEPS[@]} -eq 0 ]; then
+    echo -e "${GREEN}${CHECK_MARK} Platform installation completed successfully!${RESET}"
+else
+    echo -e "${RED}${CROSS_MARK} Platform installation finished with ${#FAILED_STEPS[@]} failed step(s):${RESET}"
+    printf '  %s\n' "${FAILED_STEPS[@]}"
+    echo "Logs: $LOGDIR"
+    exit 1
+fi

@@ -25,3 +25,17 @@ app_platform/.env
 app_platform/docker-compose.override.yml
 # Device-specific frpc config (remotePort, proxy name), preferred over frpc.toml
 app_platform/frpc/frpc.local.toml
+# Device data: not in git, kept across updates (selfInstaller.sh backs them up
+# and restores them). install.sh creates missing ones from app_platform/defaults/.
+app_platform/settings/backendSettings.json
+app_platform/settings/cameraSettings.json
+app_platform/settings/runtimeSettings.json
+app_platform/settings/settings.json
+app_platform/settings/siemenssternSettings.json
+app_platform/settings/users.json
+app_platform/settings/customer_logo.png
+app_platform/ftp/ftpsettings.json
+app_platform/ftp/status.json
+app_platform/history_images/app.csv
+app_platform/var/build_info.json
+app_platform/dump/
